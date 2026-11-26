@@ -273,6 +273,16 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
         g.setStroke(new BasicStroke(1.2f));
         g.draw(proj.quadPath(-fl * 0.72, -ft * 0.68, 1.0 + fr * 0.72, 1.0 + fb * 0.76));
 
+        // Specular metallic gold rim highlights along left & right sloped frame rails and bottom corners (reference signature!)
+        Point2D.Double leftMid = proj.project(-fl, 0.56);
+        RoyalGlowEffect.paintAmbientSpotlight(g, (float) leftMid.x, (float) leftMid.y, 48f, new Color(255, 224, 128, 92));
+        Point2D.Double rightMid = proj.project(1.0 + fr, 0.42);
+        RoyalGlowEffect.paintAmbientSpotlight(g, (float) rightMid.x, (float) rightMid.y, 42f, new Color(255, 224, 128, 76));
+        RoyalGlowEffect.paintAmbientSpotlight(g, (float) mapper.outerBL().x + 14f, (float) mapper.outerBL().y - 4f,
+                52f, new Color(255, 232, 142, 110));
+        RoyalGlowEffect.paintAmbientSpotlight(g, (float) mapper.outerBR().x - 14f, (float) mapper.outerBR().y - 4f,
+                52f, new Color(255, 232, 142, 96));
+
         // Ornate metallic gold filigree brackets at all 4 perspective corners
         paintPerspectiveCorner(g, proj, -fl * 0.88, -ft * 0.84, 0.085, 0.068);
         paintPerspectiveCorner(g, proj, 1.0 + fr * 0.88, -ft * 0.84, -0.085, 0.068);
@@ -430,10 +440,10 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
     private Dimension estimatePieceBox(Piece piece, double localTileW, int pieceScalePercent) {
         Rectangle src = assets.pieceBounds(piece);
         double userScale = pieceScalePercent / 97.0;
-        double targetH = localTileW * 1.18 * RoyalPieceRenderer.heightRatio(piece.kind()) * userScale;
-        double maxW = localTileW * 0.84 * userScale;
-        double scale = Math.min(targetH / src.height, maxW / src.width);
-        return new Dimension(Math.max(4, (int) Math.round(src.width * scale)),
+        double targetH = localTileW * 1.16 * RoyalPieceRenderer.heightRatio(piece.kind()) * userScale;
+        double maxW = localTileW * 0.88 * userScale;
+        double scale = Math.min(targetH / src.height, maxW / (src.width * 1.18));
+        return new Dimension(Math.max(4, (int) Math.round(src.width * scale * 1.18)),
                 Math.max(4, (int) Math.round(src.height * scale)));
     }
 

@@ -99,8 +99,20 @@ final class PerspectiveTextureRenderer {
                         ? sample(lightPx, lw, lh, tu, tv, bilinear)
                         : sample(darkPx, dw, dh, tu, tv, bilinear);
 
-                // Subtle depth atmospheric shading: very gently warm-lit in center, softly deepened at far back edge
-                double depthShade = 0.88 + 0.14 * v;
+                // Dramatic 3D tabletop radial spotlight: warm golden irradiance in center (cols C-F, rows 2-6),
+                // natural depth vignette towards far corners, and crisp inter-tile bevel line
+                double du = (u - 0.50) / 0.56;
+                double dv = (v - 0.54) / 0.58;
+                double radial = Math.max(0.0, 1.0 - (du * du + dv * dv));
+                double spotBoost = radial * radial * (isLight ? 0.22 : 0.28);
+                double depthShade = (0.76 + 0.22 * v) + spotBoost;
+
+                // Subtle bevel darkening right along tile seams (tu or tv near 0 or 1)
+                double edgeDist = Math.min(Math.min(tu, 1.0 - tu), Math.min(tv, 1.0 - tv));
+                if (edgeDist < 0.022) {
+                    depthShade *= 0.86 + 0.14 * (edgeDist / 0.022);
+                }
+
                 int r = (argb >> 16) & 0xFF;
                 int gr = (argb >> 8) & 0xFF;
                 int b = argb & 0xFF;
@@ -112,10 +124,11 @@ final class PerspectiveTextureRenderer {
                     gr = Math.round(gr * (1 - a) + glaze.getGreen() * a);
                     b = Math.round(b * (1 - a) + glaze.getBlue() * a);
                 }
-                r = clamp((int) Math.round(r * depthShade));
-                gr = clamp((int) Math.round(gr * depthShade));
-                b = clamp((int) Math.round(b * depthShade));
-                dst[rowOff + px] = (0xFF << 24) | (r << 16) | (gr << 8) | b;
+                // Warm golden light tint at the center of the spotlight
+                int warmR = (int) Math.round(r * depthShade + spotBoost * 34);
+                int warmG = (int) Math.round(gr * depthShade + spotBoost * 22);
+                int warmB = (int) Math.round(b * depthShade + spotBoost * 4);
+                dst[rowOff + px] = (0xFF << 24) | (clamp(warmR) << 16) | (clamp(warmG) << 8) | clamp(warmB);
             }
         }
         cachedSurface = surface;

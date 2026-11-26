@@ -13,6 +13,7 @@ final class RoyalNavigationPanel extends JPanel {
     record Item(String id, String label, RoyalIcons.Glyph glyph, Runnable action) {}
 
     private static final int EXPANDED_WIDTH = 194;
+    private static final int FOCUS_EXPANDED_WIDTH = 166;
     private static final int COMPACT_WIDTH = 64;
     private final AssetManager assets;
     private final boolean compact;
@@ -105,7 +106,10 @@ final class RoyalNavigationPanel extends JPanel {
 
     void setFocusDimmed(boolean dimmed) {
         this.focusDimmed = dimmed;
-        fadeAlpha = dimmed && !hovered ? 0.80f : 1.0f;
+        setPreferredSize(new Dimension(compact ? COMPACT_WIDTH : (dimmed ? FOCUS_EXPANDED_WIDTH : EXPANDED_WIDTH), 480));
+        setBorder(new EmptyBorder(12, compact ? 8 : (dimmed ? 9 : 12), 10, compact ? 9 : (dimmed ? 10 : 12)));
+        fadeAlpha = dimmed && !hovered ? 0.84f : 1.0f;
+        revalidate();
         repaint();
     }
 

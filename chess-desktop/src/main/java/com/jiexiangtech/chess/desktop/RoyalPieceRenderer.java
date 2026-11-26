@@ -109,12 +109,13 @@ final class RoyalPieceRenderer {
         Rectangle srcBounds = assets.pieceBounds(piece);
 
         double userScale = pieceScalePercent / 97.0;
-        // 2.5D tabletop proportions calibrated to royal-focus-reference.png (clear rank 1 & 2 separation)
-        double targetH = localTileWidth * 1.18 * heightRatio(piece.kind()) * userScale;
-        double maxW = localTileWidth * 0.84 * userScale;
-        double scale = Math.min(targetH / srcBounds.height, maxW / srcBounds.width);
+        // 2.5D tabletop proportions calibrated to royal-focus-reference.png:
+        // Camera tilt (~32 deg) foreshortens vertical height slightly while bases remain full & commanding (+18% width fullness)
+        double targetH = localTileWidth * 1.16 * heightRatio(piece.kind()) * userScale;
+        double maxW = localTileWidth * 0.88 * userScale;
+        double scale = Math.min(targetH / srcBounds.height, maxW / (srcBounds.width * 1.18));
 
-        int dw = Math.max(4, (int) Math.round(srcBounds.width * scale));
+        int dw = Math.max(4, (int) Math.round(srcBounds.width * scale * 1.18));
         int dh = Math.max(4, (int) Math.round(srcBounds.height * scale));
         int dx = (int) Math.round(anchorX - dw / 2.0);
         int dy = (int) Math.round(anchorY - dh - liftPixels);
@@ -123,15 +124,21 @@ final class RoyalPieceRenderer {
             shadows.paintPieceShadow(g, anchorX, anchorY, dw, localTileWidth, liftPixels, directionalShadow);
         }
 
+        // Warm golden floor reflection glow under front-rank ivory/gold pieces (matches reference warm marble bounce)
+        if (piece.side() == Side.WHITE && liftPixels < 2.0) {
+            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) anchorY,
+                    Math.max(8f, dw * 0.72f), new Color(246, 204, 98, 54));
+        }
+
         // Subtle warm golden rim light behind black pieces on dark marble for effortless readability
         if (piece.side() == Side.BLACK && onDarkSquare && liftPixels < 2.0) {
             RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.52),
-                    Math.max(10f, Math.max(dw, dh) * 0.58f), new Color(238, 198, 102, 74));
+                    Math.max(10f, Math.max(dw, dh) * 0.62f), new Color(242, 202, 106, 84));
         }
         // Subtle grounding contrast halo behind white pieces on ivory marble
         if (piece.side() == Side.WHITE && !onDarkSquare && liftPixels < 2.0) {
             RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.58),
-                    Math.max(10f, Math.max(dw, dh) * 0.52f), new Color(18, 14, 10, 52));
+                    Math.max(10f, Math.max(dw, dh) * 0.54f), new Color(18, 14, 10, 56));
         }
 
         if (source == null) {

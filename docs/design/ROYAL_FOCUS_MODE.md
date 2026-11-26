@@ -39,3 +39,16 @@ All coordinates below were measured directly from `royal-focus-reference.png` (`
   5. Soft corner vignette (`VignetteRenderer`) focusing visual attention squarely on the board without obscuring clocks or buttons.
 - **Focus Mode Auto-Dim**: During Royal Focus 2.5D, the Sidebar and Bottom Toolbar gently dim (`alpha = 0.68`) when the pointer is on the board and smoothly restore to full brightness (`alpha = 1.0`) when hovered!
 - **Live Mode Switching**: Players can toggle seamlessly between **Classic 2D** and **Royal Focus 2.5D** mid-game without losing state, clocks, or move history; preference and `GraphicsQuality` (`LOW`, `MEDIUM`, `HIGH`, `ULTRA`) persist to SQLite.
+
+
+## 4. Calibrated 1:1 Verification Metrics (Reference vs. Live Swing Actual)
+
+| Metric | Reference (`1024×576`) | Calibrated Actual (`1280×720`) | Delta |
+| --- | ---: | ---: | ---: |
+| Left Sidebar right edge (`% W`) | `12.99%` | `12.81%` | `-0.18%` |
+| Board outer top edge (`% H`) | `30.90%` | `31.39%` | `+0.49%` |
+| Board front lip edge (`% H`) | `82.64%` | `82.36%` | `-0.28%` |
+| Board top-plane height (`% H`) | `51.74%` | `50.97%` | `-0.77%` |
+| Board front outer width (`% W`) | `72.75%` | `71.25%` | `-1.50%` |
+| Perspective taper (`topW / botW`) | `0.5879` | `0.5910` | `+0.0031` |
+| Frame bezel ratios (`L / R / T / B`) | `0.050 / 0.050 / 0.026 / 0.068` | `0.050 / 0.050 / 0.026 / 0.068` | `0.000` |
