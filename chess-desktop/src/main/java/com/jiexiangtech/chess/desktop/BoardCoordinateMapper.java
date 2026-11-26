@@ -5,7 +5,7 @@ import com.jiexiangtech.chess.domain.Square;
 
 record BoardCoordinateMapper(int x, int y, int tile, boolean flipped) {
     static BoardCoordinateMapper fit(int width, int height, boolean flipped) {
-        int tile = Math.max(1, (Math.min(width, height) - 46) / 8);
+        int tile = Math.max(1, (Math.min(width, height) - (RoyalBoardFrame.BEZEL * 2 + 8)) / 8);
         int span = tile * 8;
         return new BoardCoordinateMapper((width - span) / 2, (height - span) / 2, tile, flipped);
     }

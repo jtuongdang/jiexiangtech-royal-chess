@@ -14,11 +14,11 @@ final class RoyalGameClock extends JLabel {
     RoyalGameClock() {
         super("—", SwingConstants.CENTER);
         setOpaque(false);
-        setFont(mono(Font.BOLD, 22f));
+        setFont(mono(Font.BOLD, 23f));
         setForeground(MUTED);
-        setBorder(new EmptyBorder(6, 14, 6, 14));
-        setPreferredSize(new Dimension(118, 40));
-        setMinimumSize(new Dimension(104, 38));
+        setBorder(new EmptyBorder(6, 12, 6, 12));
+        setPreferredSize(new Dimension(106, 42));
+        setMinimumSize(new Dimension(96, 38));
     }
 
     void update(String text, boolean timed, boolean active, boolean lowTime) {
@@ -26,7 +26,7 @@ final class RoyalGameClock extends JLabel {
         this.active = active;
         this.lowTime = timed && lowTime;
         setText(timed ? text : "∞");
-        setForeground(!timed ? MUTED : this.lowTime && active ? WARN_CLOCK : active ? PALE : new Color(0x989186));
+        setForeground(!timed ? MUTED : this.lowTime && active ? WARN_CLOCK : active ? new Color(0xF9E3A2) : new Color(0x9FA1A8));
         repaint();
     }
 
@@ -35,20 +35,20 @@ final class RoyalGameClock extends JLabel {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int w = getWidth(), h = getHeight();
         if (active && lowTime) {
-            g.setPaint(new GradientPaint(0, 0, new Color(0x3D181B), 0, h, new Color(0x240E10)));
-            g.fillRoundRect(0, 0, w, h, 11, 11);
-            g.setColor(new Color(235, 95, 85, 195));
-            g.drawRoundRect(0, 0, w - 1, h - 1, 11, 11);
+            g.setPaint(new GradientPaint(0, 0, new Color(0x42191C), 0, h, new Color(0x240E10)));
+            g.fillRoundRect(0, 0, w, h, 10, 10);
+            g.setColor(new Color(235, 95, 85, 200));
+            g.drawRoundRect(0, 0, w - 1, h - 1, 10, 10);
         } else if (active && timed) {
-            g.setPaint(new GradientPaint(0, 0, new Color(0x2B2314), 0, h, new Color(0x1A150D)));
-            g.fillRoundRect(0, 0, w, h, 11, 11);
-            g.setColor(new Color(212, 175, 55, 175));
-            g.drawRoundRect(0, 0, w - 1, h - 1, 11, 11);
+            g.setPaint(new GradientPaint(0, 0, new Color(36, 27, 13, 215), 0, h, new Color(22, 17, 9, 230)));
+            g.fillRoundRect(0, 0, w, h, 10, 10);
+            g.setColor(new Color(230, 188, 82, 170));
+            g.drawRoundRect(0, 0, w - 1, h - 1, 10, 10);
         } else {
-            g.setColor(new Color(0x111014));
-            g.fillRoundRect(0, 0, w, h, 11, 11);
-            g.setColor(new Color(0x2A251D));
-            g.drawRoundRect(0, 0, w - 1, h - 1, 11, 11);
+            g.setColor(new Color(14, 13, 16, 205));
+            g.fillRoundRect(0, 0, w, h, 10, 10);
+            g.setColor(new Color(74, 62, 42, 120));
+            g.drawRoundRect(0, 0, w - 1, h - 1, 10, 10);
         }
         g.dispose();
         super.paintComponent(graphics);

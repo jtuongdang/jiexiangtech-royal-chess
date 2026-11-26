@@ -83,6 +83,17 @@ final class RoyalFrame extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent e) { navigate(RoyalFrame.this::shutdown); }
         });
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent e) {
+                if (currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView) {
+                    boolean wantCompact = getWidth() < 1180;
+                    if (wantCompact != sidebarCompact) {
+                        sidebarCompact = wantCompact;
+                        mountShell();
+                    }
+                }
+            }
+        });
         auth(false);
     }
 
@@ -96,6 +107,8 @@ final class RoyalFrame extends JFrame {
     void setStatus(String message) { if (footer != null) footer.setText(message); }
 
     private String display() { return user.guest() ? text.get("guestName") : user.displayName(); }
+    String displayLabel() { return display(); }
+    int currentRating() { return profile == null ? 1200 : profile.rating(); }
     private String t(String key, Object... args) { return text.get(key, args); }
 
     String playerName(MatchOptions options, Side side) {
@@ -247,13 +260,15 @@ final class RoyalFrame extends JFrame {
     }
 
     private void mountShell() {
-        JPanel root = new RoyalBackgroundPanel(new BorderLayout(), null, 0, false);
+        boolean cinematicBackdrop = currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView;
+        JPanel root = new RoyalBackgroundPanel(new BorderLayout(),
+                cinematicBackdrop ? assets.brand(BrandingManager.GAMEPLAY_BG) : null, 0, false);
         root.add(navigationPanel(currentPage, sidebarCompact), BorderLayout.WEST);
         JPanel main = transparent(new BorderLayout());
         main.add(currentContent, BorderLayout.CENTER);
         footer = caption(" ");
-        footer.setBorder(new EmptyBorder(0, 28, 6, 12));
-        main.add(footer, BorderLayout.SOUTH);
+        footer.setBorder(new EmptyBorder(0, 28, 4, 12));
+        if (!cinematicBackdrop) main.add(footer, BorderLayout.SOUTH);
         root.add(main, BorderLayout.CENTER);
         setContentPane(root);
         getRootPane().setDefaultButton(null);
@@ -269,7 +284,7 @@ final class RoyalFrame extends JFrame {
     private RoyalNavigationPanel navigationPanel(Page selected, boolean compact) {
         List<RoyalNavigationPanel.Item> items = List.of(
                 new RoyalNavigationPanel.Item(Page.HOME.name(), t("home"), RoyalIcons.Glyph.HOME, () -> navigate(this::dashboard)),
-                new RoyalNavigationPanel.Item(Page.NEW.name(), t("newGame"), RoyalIcons.Glyph.NEW_GAME, () -> navigate(() -> newGame(MatchOptions.Mode.LOCAL))),
+                new RoyalNavigationPanel.Item(Page.NEW.name(), t("newGame"), RoyalIcons.Glyph.PLUS, () -> navigate(() -> newGame(MatchOptions.Mode.LOCAL))),
                 new RoyalNavigationPanel.Item(Page.PUZZLES.name(), t("puzzles"), RoyalIcons.Glyph.PUZZLES, () -> navigate(this::puzzleList)),
                 new RoyalNavigationPanel.Item(Page.HISTORY.name(), t("history"), RoyalIcons.Glyph.HISTORY, () -> navigate(this::history)),
                 new RoyalNavigationPanel.Item(Page.LEADERBOARD.name(), t("leaderboard"), RoyalIcons.Glyph.LEADERBOARD, () -> navigate(this::leaderboard)),
@@ -277,7 +292,7 @@ final class RoyalFrame extends JFrame {
                 new RoyalNavigationPanel.Item(Page.ACHIEVEMENTS.name(), t("achievements"), RoyalIcons.Glyph.ACHIEVEMENTS, () -> navigate(this::achievements)),
                 new RoyalNavigationPanel.Item(Page.SETTINGS.name(), t("settings"), RoyalIcons.Glyph.SETTINGS, () -> navigate(this::settings))
         );
-        return new RoyalNavigationPanel(branding, items, selected.name(), display(),
+        return new RoyalNavigationPanel(branding, assets, items, selected.name(), display(),
                 t("about"), t("signOut"), t("toggleSidebar"), compact,
                 this::toggleSidebar, this::about, () -> navigate(this::signOut));
     }
@@ -786,7 +801,7 @@ final class RoyalFrame extends JFrame {
 
     private void live(GameSession session) {
         MatchView live = new MatchView(this, session);
-        show(Page.NEW, live, true);
+        show(Page.NEW, live, getWidth() < 1180);
         match = live;
     }
 
@@ -1496,12 +1511,13 @@ final class RoyalFrame extends JFrame {
     void visualGuest() { enter(new LoginData(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"), prefs)); }
 
     void visualMatch() {
-        var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.LOCAL, Side.WHITE,
-                MatchOptions.Level.MEDIUM, 600_000, 5000, "royal"), System::nanoTime);
+        var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
+                MatchOptions.Level.HARD, 600_000, 5000, "royal"), System::nanoTime);
         game.resume();
         for (String move : "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 d7c6".split(" ")) game.play(Move.uci(move));
         game.pause();
         live(game);
+        if (match != null) match.boardPanel().selectSquare(Square.at(3, 1)); // d2 pawn selected with legal moves highlighted
     }
 
     void visualNewGame() { newGame(MatchOptions.Mode.COMPUTER); }

@@ -6,8 +6,8 @@ import javax.swing.Icon;
 
 final class RoyalIcons {
     enum Glyph {
-        HOME, NEW_GAME, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS,
-        ABOUT, SIGN_OUT, COLLAPSE, EXPAND,
+        HOME, NEW_GAME, PLUS, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS,
+        ABOUT, SIGN_OUT, COLLAPSE, EXPAND, DOC_LIST,
         SAVE, UNDO, HINT, DRAW, RESIGN, FLIP, SOUND_ON, SOUND_OFF, FULLSCREEN, PAUSE,
         FIRST, PREV, NEXT, LAST, PLAY, STOP, ANALYZE,
         SEARCH, CROWN, TROPHY, LOCK, CHECK, CPU, PLAYERS, SPARK, CLOCK, EXPORT, IMPORT
@@ -45,6 +45,16 @@ final class RoyalIcons {
                 g2.draw(new Line2D.Double(15.5, 4.5, 15.5, 8));
                 g2.draw(new Line2D.Double(8, 4.5, 4.5, 4.5));
                 g2.draw(new Line2D.Double(4.5, 4.5, 4.5, 8));
+            }
+            case PLUS -> {
+                g2.draw(new Line2D.Double(10, 4, 10, 16));
+                g2.draw(new Line2D.Double(4, 10, 16, 10));
+            }
+            case DOC_LIST -> {
+                g2.draw(new RoundRectangle2D.Double(4.5, 3, 11, 14, 2, 2));
+                g2.draw(new Line2D.Double(7.2, 7, 12.8, 7));
+                g2.draw(new Line2D.Double(7.2, 10, 12.8, 10));
+                g2.draw(new Line2D.Double(7.2, 13, 11, 13));
             }
             case PUZZLES -> {
                 Path2D p = new Path2D.Double();

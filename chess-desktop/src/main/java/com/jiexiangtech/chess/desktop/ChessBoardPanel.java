@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import javax.swing.JPanel;
-import javax.swing.Timer;
 import com.jiexiangtech.chess.application.Preferences;
 import com.jiexiangtech.chess.domain.*;
 
@@ -19,40 +18,39 @@ final class ChessBoardPanel extends JPanel {
     interface PromotionPicker { Kind choose(List<Move> options); }
 
     private final AssetManager assets;
+    private final RoyalPieceRenderer pieceRenderer;
+    private final RoyalAnimationEngine animator;
     private final Preferences preferences;
     private final String theme;
     private final BooleanSupplier playable;
     private final PromotionPicker promotion;
     private final Consumer<Move> onMove;
-    private final Timer timer;
     private Position position;
     private Move last, hint;
     private int selected = -1, pressed = -1, hovered = -1;
     private Point origin, mouse;
     private List<Move> candidates = List.of();
-    private boolean flipped, check, celebrating;
-    private long animatedAt, celebrationAt;
+    private boolean flipped, check;
     private Piece disappearing;
-    private int capturedSquare;
+    private int capturedSquare = -1;
+    private String overlayTitle, overlaySubtitle;
+    private Color overlayAccent = RoyalStyle.PALE;
 
     ChessBoardPanel(AssetManager assets, Preferences preferences, String theme, BooleanSupplier playable,
                     PromotionPicker promotion, Consumer<Move> onMove) {
         this.assets = assets;
+        this.pieceRenderer = new RoyalPieceRenderer(assets);
+        this.animator = new RoyalAnimationEngine(this);
+        this.animator.setEnabled(preferences.animation());
         this.preferences = preferences;
         this.theme = theme;
         this.playable = playable;
         this.promotion = promotion;
         this.onMove = onMove;
         setOpaque(false);
-        setPreferredSize(new Dimension(700, 700));
-        setMinimumSize(new Dimension(240, 240));
-        timer = new Timer(16, event -> {
-            if (progress() >= 1 && (!celebrating || celebrationProgress() >= 1)) {
-                celebrating = false;
-                ((Timer) event.getSource()).stop();
-            }
-            repaint();
-        });
+        setPreferredSize(new Dimension(740, 740));
+        setMinimumSize(new Dimension(280, 280));
+
         var input = new MouseAdapter() {
             @Override public void mouseMoved(MouseEvent event) {
                 if (position == null || !playable.getAsBoolean()) {
@@ -114,8 +112,9 @@ final class ChessBoardPanel extends JPanel {
         hint = null;
         check = Rules.inCheck(next, next.turn());
         clearSelection();
-        animatedAt = animate && move != null && preferences.animation() ? System.nanoTime() : 0;
-        if (animatedAt != 0) timer.start();
+        if (animate && move != null) animator.triggerMove();
+        else animator.clearMove();
+        animator.setAmbientPulse(check);
         repaint();
     }
 
@@ -123,18 +122,33 @@ final class ChessBoardPanel extends JPanel {
     void flip() { setFlipped(!flipped); }
     void setFlipped(boolean value) { flipped = value; clearSelection(); repaint(); }
 
-    void celebrate() {
-        if (!preferences.animation()) return;
-        celebrating = true;
-        celebrationAt = System.nanoTime();
-        timer.start();
+    /** Allows programmatic square selection (used in interactive UX and visual QA checks). */
+    void selectSquare(int square) {
+        if (position != null && select(square)) repaint();
     }
 
-    @Override public void removeNotify() { timer.stop(); super.removeNotify(); }
+    void celebrate() {
+        animator.triggerCelebration();
+    }
+
+    void showOutcomeOverlay(String title, String subtitle, Color accent) {
+        this.overlayTitle = title;
+        this.overlaySubtitle = subtitle;
+        this.overlayAccent = accent;
+        animator.triggerOverlayFade();
+        repaint();
+    }
+
+    void clearOutcomeOverlay() {
+        this.overlayTitle = null;
+        this.overlaySubtitle = null;
+        animator.clearOverlay();
+        repaint();
+    }
+
+    @Override public void removeNotify() { animator.stop(); super.removeNotify(); }
 
     private BoardCoordinateMapper geometry() { return BoardCoordinateMapper.fit(getWidth(), getHeight(), flipped); }
-    private double progress() { return animatedAt == 0 ? 1 : Math.min(1, (System.nanoTime() - animatedAt) / 185_000_000.0); }
-    private double celebrationProgress() { return Math.min(1, (System.nanoTime() - celebrationAt) / 1_150_000_000.0); }
 
     private boolean isOwnPiece(int sq) {
         Piece p = position.piece(sq);
@@ -150,6 +164,7 @@ final class ChessBoardPanel extends JPanel {
         if (!isOwnPiece(square)) return false;
         selected = square;
         candidates = Rules.legalMoves(position, square);
+        animator.setAmbientPulse(true);
         return true;
     }
 
@@ -170,6 +185,7 @@ final class ChessBoardPanel extends JPanel {
         selected = pressed = -1;
         origin = mouse = null;
         candidates = List.of();
+        animator.setAmbientPulse(check);
     }
 
     @Override protected void paintComponent(Graphics graphics) {
@@ -183,124 +199,115 @@ final class ChessBoardPanel extends JPanel {
                 ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
         BoardCoordinateMapper board = geometry();
-        int x = board.x(), y = board.y(), size = board.tile() * 8;
-        int bezel = 20;
+        RoyalBoardFrame.paintOuterFrame(g, board);
 
-        // Subtle ambient royal gold glow radiating behind the chessboard
-        float cx = x + size / 2f, cy = y + size / 2f;
-        float glowRadius = size * 0.64f;
-        g.setPaint(new RadialGradientPaint(cx, cy, Math.max(1f, glowRadius),
-                new float[]{0.55f, 0.82f, 1f},
-                new Color[]{new Color(212, 175, 55, 42), new Color(212, 175, 55, 16), new Color(0, 0, 0, 0)}));
-        g.fillOval((int) (cx - glowRadius), (int) (cy - glowRadius), (int) (glowRadius * 2), (int) (glowRadius * 2));
-
-        // Layered drop shadow beneath frame
-        g.setColor(new Color(0, 0, 0, 150));
-        g.fillRoundRect(x - bezel - 2, y - bezel + 2, size + bezel * 2 + 4, size + bezel * 2 + 4, 16, 16);
-
-        // Luxury obsidian-walnut frame bezel
-        g.setPaint(new GradientPaint(x - bezel, y - bezel, new Color(0x2D2318), x + size + bezel, y + size + bezel, new Color(0x14110F)));
-        g.fillRoundRect(x - bezel, y - bezel, size + bezel * 2, size + bezel * 2, 13, 13);
-
-        // Metallic gold outer rim & recessed dark inner bevel
-        g.setPaint(new GradientPaint(x - bezel, y - bezel, new Color(0xD8B454), x + size + bezel, y + size + bezel, new Color(0x745828)));
-        g.drawRoundRect(x - bezel, y - bezel, size + bezel * 2 - 1, size + bezel * 2 - 1, 13, 13);
-        g.setColor(new Color(0x0E0C0A));
-        g.drawRoundRect(x - bezel + 2, y - bezel + 2, size + bezel * 2 - 5, size + bezel * 2 - 5, 10, 10);
-
-        // Tight metallic gold fillet framing the 8x8 tiles
-        g.setColor(new Color(0xC9A23F));
-        g.drawRect(x - 2, y - 2, size + 3, size + 3);
-        g.setColor(new Color(0x15120E));
-        g.drawRect(x - 1, y - 1, size + 1, size + 1);
-
-        // Board squares
+        // 64 marble tiles
         for (int square = 0; square < 64; square++) drawTile(g, board.bounds(square), square);
 
         // Last move highlight
         if (last != null) {
-            fill(g, board.bounds(last.from()), new Color(236, 198, 86, 78));
-            fill(g, board.bounds(last.to()), new Color(242, 206, 98, 102));
+            fill(g, board.bounds(last.from()), new Color(238, 198, 86, 68));
+            fill(g, board.bounds(last.to()), new Color(244, 208, 96, 94));
         }
 
         // Hover highlight on playable piece or candidate target
         if (hovered >= 0 && hovered != selected && playable.getAsBoolean() && (isOwnPiece(hovered) || isCandidateTarget(hovered))) {
             Rectangle hArea = board.bounds(hovered);
-            fill(g, hArea, new Color(242, 215, 139, 34));
-            outline(g, hArea, new Color(242, 215, 139, 135), 1.6f);
+            fill(g, hArea, new Color(246, 218, 134, 34));
+            outline(g, hArea, new Color(246, 218, 134, 155), 1.8f);
         }
 
-        // Selected square warm gold glow
+        float pulse = animator.pulse();
+
+        // Selected square luminous golden bloom (matches reference e4 glow)
         if (selected >= 0) {
             Rectangle sArea = board.bounds(selected);
-            fill(g, sArea, new Color(212, 175, 55, 76));
-            outline(g, sArea, RoyalStyle.PALE, 2.4f);
+            int glowAlpha = Math.round(115 + 35 * pulse);
+            fill(g, sArea, new Color(255, 224, 114, glowAlpha));
+            RoyalGlowEffect.paintAmbientSpotlight(g, (float) sArea.getCenterX(), (float) sArea.getCenterY(),
+                    sArea.width * 0.72f, new Color(255, 232, 138, Math.round(135 + 45 * pulse)));
+            RoyalGlowEffect.paintOuterGlow(g, sArea.x, sArea.y, sArea.width, sArea.height, 4,
+                    new Color(255, 222, 112, Math.round(165 + 50 * pulse)), 4);
+            outline(g, sArea, new Color(0xFFF6C8), 3.0f);
         }
 
-        // Check warning crimson radial aura
+        // Check warning crimson radial pulse
         if (check) {
             Rectangle king = board.bounds(position.king(position.turn()));
-            g.setPaint(new RadialGradientPaint((float) king.getCenterX(), (float) king.getCenterY(), board.tile() * 0.68f,
-                    new float[]{0f, 0.65f, 1f},
-                    new Color[]{new Color(230, 48, 36, 225), new Color(175, 24, 18, 130), new Color(95, 10, 8, 20)}));
+            int coreAlpha = Math.round(205 + 40 * pulse);
+            g.setPaint(new RadialGradientPaint((float) king.getCenterX(), (float) king.getCenterY(), board.tile() * 0.70f,
+                    new float[]{0f, 0.62f, 1f},
+                    new Color[]{new Color(235, 44, 36, coreAlpha), new Color(180, 22, 16, 135), new Color(95, 10, 8, 22)}));
             g.fill(king);
-            outline(g, king, new Color(255, 115, 100, 210), 2.0f);
+            outline(g, king, new Color(255, 118, 102, Math.round(180 + 60 * pulse)), 2.2f);
         }
 
-        // Legal move indicators
+        // Legal move indicators (luminous sage-gold disc / capture ring matching reference e5/e6)
         for (Move candidate : candidates) {
-            drawLegal(g, board.bounds(candidate.to()), position.captured(candidate) != null);
+            drawLegal(g, board.bounds(candidate.to()), position.captured(candidate) != null, pulse);
         }
 
-        // Hint highlight & subtle directional arrow
+        // Hint square highlight
         if (hint != null) {
             Rectangle hf = board.bounds(hint.from()), ht = board.bounds(hint.to());
-            fill(g, hf, new Color(112, 227, 156, 46));
-            fill(g, ht, new Color(112, 227, 156, 64));
+            fill(g, hf, new Color(112, 227, 156, 48));
+            fill(g, ht, new Color(112, 227, 156, 68));
             outline(g, hf, RoyalStyle.SUCCESS, 2.2f);
             outline(g, ht, RoyalStyle.SUCCESS, 2.2f);
         }
 
-        double t = progress();
+        double t = animator.moveProgress();
         // Fading captured piece
-        if (t < 1 && disappearing != null && capturedSquare >= 0) {
-            g.setComposite(AlphaComposite.SrcOver.derive((float) (1 - t)));
-            drawPiece(g, disappearing, board.bounds(capturedSquare), isDarkSquare(capturedSquare), false);
+        if (t < 1.0 && disappearing != null && capturedSquare >= 0) {
+            g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0.0, 1.0 - t)));
+            pieceRenderer.drawPiece(g, disappearing, board.bounds(capturedSquare),
+                    preferences.pieceScale(), preferences.highQuality(), isDarkSquare(capturedSquare), false);
             g.setComposite(AlphaComposite.SrcOver);
         }
 
         // Static pieces
         for (int square = 0; square < 64; square++) {
             Piece piece = position.piece(square);
-            if (piece != null && !(square == selected && mouse != null) && !(t < 1 && last != null && square == last.to())) {
-                drawPiece(g, piece, board.bounds(square), isDarkSquare(square), false);
+            if (piece != null && !(square == selected && mouse != null) && !(t < 1.0 && last != null && square == last.to())) {
+                pieceRenderer.drawPiece(g, piece, board.bounds(square),
+                        preferences.pieceScale(), preferences.highQuality(), isDarkSquare(square), false);
             }
         }
 
-        // Moving piece animation
-        if (t < 1 && last != null) {
+        // Smooth moving piece animation
+        if (t < 1.0 && last != null) {
             Rectangle from = board.bounds(last.from()), to = board.bounds(last.to());
-            double eased = 1 - Math.pow(1 - t, 3);
+            double eased = animator.easedMoveProgress();
             Rectangle moving = new Rectangle(
                     from.x + (int) Math.round((to.x - from.x) * eased),
                     from.y + (int) Math.round((to.y - from.y) * eased),
                     from.width, from.height);
-            drawPiece(g, position.piece(last.to()), moving, isDarkSquare(last.to()), false);
+            pieceRenderer.drawPiece(g, position.piece(last.to()), moving,
+                    preferences.pieceScale(), preferences.highQuality(), isDarkSquare(last.to()), false);
         }
 
-        // Hint arrow drawn over pieces for instant clarity
+        // Hint directional arrow
         if (hint != null) {
             drawHintArrow(g, board.bounds(hint.from()), board.bounds(hint.to()));
         }
 
-        // Dragged piece (elevated above board)
+        // Elevated dragged piece
         if (mouse != null && selected >= 0) {
             int tile = board.tile();
-            drawPiece(g, position.piece(selected), new Rectangle(mouse.x - tile / 2, mouse.y - tile / 2, tile, tile), true, true);
+            pieceRenderer.drawPiece(g, position.piece(selected),
+                    new Rectangle(mouse.x - tile / 2, mouse.y - tile / 2, tile, tile),
+                    preferences.pieceScale(), preferences.highQuality(), true, true);
         }
 
-        if (celebrating) paintSparks(g, board, celebrationProgress());
-        coordinates(g, board, bezel);
+        RoyalBoardFrame.paintInnerShadowAndCoordinates(g, board);
+
+        if (animator.isCelebrating()) {
+            paintSparks(g, board, animator.celebrationProgress());
+        }
+
+        if (overlayTitle != null) {
+            paintOutcomeOverlay(g, board, (float) animator.overlayProgress());
+        }
         g.dispose();
     }
 
@@ -327,23 +334,28 @@ final class ChessBoardPanel extends JPanel {
         g.setStroke(new BasicStroke(1));
     }
 
-    private static void drawLegal(Graphics2D g, Rectangle area, boolean capture) {
+    private static void drawLegal(Graphics2D g, Rectangle area, boolean capture, float pulse) {
         double cx = area.getCenterX(), cy = area.getCenterY();
         if (capture) {
             double r = area.width * 0.43;
-            g.setColor(new Color(0, 0, 0, 110));
-            g.setStroke(new BasicStroke(Math.max(4f, area.width * 0.08f)));
+            g.setColor(new Color(0, 0, 0, 120));
+            g.setStroke(new BasicStroke(Math.max(4f, area.width * 0.085f)));
             g.draw(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
-            g.setColor(new Color(242, 206, 98, 225));
+            g.setColor(new Color(246, 212, 108, Math.round(205 + 40 * pulse)));
             g.setStroke(new BasicStroke(Math.max(2.6f, area.width * 0.052f)));
             g.draw(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
             g.setStroke(new BasicStroke(1));
         } else {
-            double r = Math.max(4.5, area.width * 0.14);
-            g.setColor(new Color(0, 0, 0, 95));
-            g.fill(new Ellipse2D.Double(cx - r - 1.2, cy - r - 1.2, (r + 1.2) * 2, (r + 1.2) * 2));
-            g.setColor(new Color(238, 198, 84, 215));
+            // Soft luminous sage-gold disc matching reference legal move targets
+            RoyalGlowEffect.paintAmbientSpotlight(g, (float) cx, (float) cy, area.width * 0.44f,
+                    new Color(172, 198, 106, Math.round(62 + 26 * pulse)));
+            double r = Math.max(6.5, area.width * 0.21);
+            g.setColor(new Color(176, 194, 108, Math.round(135 + 35 * pulse)));
             g.fill(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
+            g.setColor(new Color(235, 240, 175, Math.round(145 + 45 * pulse)));
+            g.setStroke(new BasicStroke(1.5f));
+            g.draw(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
+            g.setStroke(new BasicStroke(1));
         }
     }
 
@@ -357,7 +369,7 @@ final class ChessBoardPanel extends JPanel {
         double ex = x2 - Math.cos(angle) * head * 0.72;
         double ey = y2 - Math.sin(angle) * head * 0.72;
 
-        g.setColor(new Color(112, 227, 156, 175));
+        g.setColor(new Color(112, 227, 156, 185));
         g.setStroke(new BasicStroke(Math.max(4f, from.width * 0.085f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(new Line2D.Double(sx, sy, ex, ey));
 
@@ -370,93 +382,44 @@ final class ChessBoardPanel extends JPanel {
         g.setStroke(new BasicStroke(1));
     }
 
-    private static double heightFactor(Kind kind) {
-        return switch (kind) {
-            case KING -> 0.93;
-            case QUEEN -> 0.89;
-            case BISHOP -> 0.84;
-            case KNIGHT -> 0.82;
-            case ROOK -> 0.78;
-            case PAWN -> 0.73;
-        };
-    }
+    private void paintOutcomeOverlay(Graphics2D g, BoardCoordinateMapper b, float alpha) {
+        if (alpha <= 0.01f) return;
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setComposite(AlphaComposite.SrcOver.derive(alpha));
+        int x = b.x(), y = b.y(), span = b.tile() * 8;
+        g2.setColor(new Color(8, 7, 10, 172));
+        g2.fillRect(x, y, span, span);
 
-    private void drawPiece(Graphics2D g, Piece piece, Rectangle tile, boolean onDarkSquare, boolean dragged) {
-        if (piece == null) return;
-        BufferedImage image = assets.piece(piece);
-        Rectangle src = assets.pieceBounds(piece);
+        int cw = Math.min(span - 40, 340), ch = 126;
+        int cx = x + (span - cw) / 2, cy = y + (span - ch) / 2;
+        RoyalGlowEffect.paintOuterGlow(g2, cx, cy, cw, ch, 16,
+                new Color(overlayAccent.getRed(), overlayAccent.getGreen(), overlayAccent.getBlue(), 110), 4);
+        g2.setPaint(new GradientPaint(cx, cy, new Color(0x211D16), cx, cy + ch, new Color(0x111014)));
+        g2.fillRoundRect(cx, cy, cw, ch, 16, 16);
+        RoyalGlowEffect.paintMetallicGoldBorder(g2, cx, cy, cw, ch, 16, 1.8f, true);
 
-        double userScale = preferences.pieceScale() / 97.0;
-        double lift = dragged ? 1.07 : 1.0;
-        double targetH = tile.height * heightFactor(piece.kind()) * userScale * lift;
-        double maxW = tile.width * 0.86 * lift;
-        double scale = Math.min(targetH / src.height, maxW / src.width);
+        g2.setFont(RoyalStyle.serif(Font.BOLD, 34));
+        FontMetrics fm = g2.getFontMetrics();
+        g2.setColor(overlayAccent);
+        g2.drawString(overlayTitle, cx + (cw - fm.stringWidth(overlayTitle)) / 2, cy + 62);
 
-        int dw = Math.max(4, (int) Math.round(src.width * scale));
-        int dh = Math.max(4, (int) Math.round(src.height * scale));
-        int baseY = tile.y + (int) Math.round(tile.height * 0.915) - (dragged ? Math.max(4, tile.height / 10) : 0);
-        int dx = tile.x + (tile.width - dw) / 2;
-        int dy = baseY - dh;
-
-        // Subtle warm golden rim lift behind black pieces standing on dark squares so silhouettes stay unmistakable
-        if (piece.side() == Side.BLACK && onDarkSquare && !dragged) {
-            float glowX = tile.x + tile.width / 2f;
-            float glowY = dy + dh * 0.56f;
-            float glowR = Math.max(8f, Math.max(dw, dh) * 0.62f);
-            g.setPaint(new RadialGradientPaint(glowX, glowY, glowR,
-                    new float[]{0f, 0.58f, 1f},
-                    new Color[]{new Color(228, 194, 110, 62), new Color(196, 158, 76, 26), new Color(0, 0, 0, 0)}));
-            g.fillOval((int) (glowX - glowR), (int) (glowY - glowR), (int) (glowR * 2), (int) (glowR * 2));
+        if (overlaySubtitle != null) {
+            g2.setFont(RoyalStyle.sans(Font.PLAIN, 14f));
+            FontMetrics sfm = g2.getFontMetrics();
+            g2.setColor(RoyalStyle.IVORY);
+            g2.drawString(overlaySubtitle, cx + (cw - sfm.stringWidth(overlaySubtitle)) / 2, cy + 94);
         }
-
-        // Realistic two-layer contact shadow anchored directly beneath the piece base
-        int shadowW = Math.max(8, (int) Math.round(dw * (dragged ? 1.06 : 0.96)));
-        int shadowH = Math.max(4, (int) Math.round(tile.height * (dragged ? 0.16 : 0.13)));
-        int shadowX = tile.x + (tile.width - shadowW) / 2;
-        int shadowY = tile.y + (int) Math.round(tile.height * 0.915) - shadowH / 2 + (dragged ? 3 : 0);
-        g.setColor(new Color(0, 0, 0, dragged ? 75 : 95));
-        g.fillOval(shadowX - 2, shadowY, shadowW + 4, shadowH + 2);
-        g.setColor(new Color(0, 0, 0, dragged ? 85 : 135));
-        g.fillOval(shadowX + shadowW / 10, shadowY + 1, shadowW * 4 / 5, Math.max(2, shadowH * 2 / 3));
-
-        if (image != null) {
-            g.drawImage(image, dx, dy, dx + dw, dy + dh,
-                    src.x, src.y, src.x + src.width, src.y + src.height, null);
-        } else {
-            g.setColor(piece.side() == Side.WHITE ? RoyalStyle.IVORY : new Color(0x201913));
-            g.fillOval(dx, dy, dw, dh);
-            g.setColor(piece.side() == Side.WHITE ? RoyalStyle.BG : RoyalStyle.PALE);
-            g.setFont(getFont().deriveFont(Font.BOLD, dh / 2.2f));
-            g.drawString(String.valueOf(piece.kind().symbol), dx + dw / 3, dy + dh * 2 / 3);
-        }
-    }
-
-    private void coordinates(Graphics2D g, BoardCoordinateMapper b, int bezel) {
-        Font font = RoyalStyle.sans(Font.BOLD, Math.max(10.5f, Math.min(12.5f, b.tile() * 0.16f)));
-        g.setFont(font);
-        FontMetrics fm = g.getFontMetrics(font);
-        g.setColor(new Color(0xD5BA7A));
-        for (int i = 0; i < 8; i++) {
-            String file = String.valueOf((char) (flipped ? 'H' - i : 'A' + i));
-            String rank = String.valueOf((char) (flipped ? '1' + i : '8' - i));
-            int fx = b.x() + b.tile() * i + (b.tile() - fm.stringWidth(file)) / 2;
-            int fy = b.y() + b.tile() * 8 + (bezel + fm.getAscent() - fm.getDescent()) / 2;
-            g.drawString(file, fx, fy);
-
-            int rx = b.x() - (bezel + fm.stringWidth(rank)) / 2;
-            int ry = b.y() + b.tile() * i + (b.tile() + fm.getAscent() - fm.getDescent()) / 2;
-            g.drawString(rank, rx, ry);
-        }
+        g2.dispose();
     }
 
     private static void paintSparks(Graphics2D g, BoardCoordinateMapper b, double t) {
-        g.setColor(new Color(246, 207, 113, (int) (210 * (1 - t))));
+        g.setColor(new Color(246, 207, 113, (int) (220 * (1 - t))));
         int span = b.tile() * 8;
-        for (int i = 0; i < 36; i++) {
+        for (int i = 0; i < 42; i++) {
             double angle = i * 2.39996;
-            double r = span * (.14 + (i % 7) * .025) * t;
+            double r = span * (.14 + (i % 7) * .026) * t;
             int x = b.x() + span / 2 + (int) (Math.cos(angle) * r * 2.5);
-            int y = b.y() + span / 2 + (int) (Math.sin(angle) * r * 2.5 + t * t * 40);
+            int y = b.y() + span / 2 + (int) (Math.sin(angle) * r * 2.5 + t * t * 42);
             g.fillOval(x, y, 2 + i % 4, 2 + i % 4);
         }
     }

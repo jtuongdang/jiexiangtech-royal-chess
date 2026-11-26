@@ -4,123 +4,116 @@ import java.awt.*;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import com.jiexiangtech.chess.domain.Kind;
+import com.jiexiangtech.chess.domain.Piece;
+import com.jiexiangtech.chess.domain.Side;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 
 final class RoyalNavigationPanel extends JPanel {
     record Item(String id, String label, RoyalIcons.Glyph glyph, Runnable action) {}
 
-    private static final int EXPANDED_WIDTH = 220;
+    private static final int EXPANDED_WIDTH = 214;
     private static final int COMPACT_WIDTH = 66;
+    private final AssetManager assets;
+    private final boolean compact;
 
-    RoyalNavigationPanel(BrandingManager branding, List<Item> items, String selectedId, String playerName,
-                         String aboutLabel, String signOutLabel, String toggleTooltip,
+    RoyalNavigationPanel(BrandingManager branding, AssetManager assets, List<Item> items, String selectedId,
+                         String playerName, String aboutLabel, String signOutLabel, String toggleTooltip,
                          boolean compact, Runnable onToggleCompact, Runnable onAbout, Runnable onSignOut) {
-        super(new BorderLayout(0, 14));
-        setOpaque(true);
-        setBackground(new Color(0x111013));
+        super(new BorderLayout(0, 10));
+        this.assets = assets;
+        this.compact = compact;
+        setOpaque(false);
         setPreferredSize(new Dimension(compact ? COMPACT_WIDTH : EXPANDED_WIDTH, 480));
-        setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 0, 1, new Color(0x2C251B)),
-                new EmptyBorder(16, compact ? 9 : 14, 14, compact ? 9 : 14)));
+        setBorder(new EmptyBorder(14, compact ? 8 : 14, 12, compact ? 9 : 14));
 
-        // Top brand + collapse/expand control
-        JPanel top = transparent(new BorderLayout(0, 10));
+        // Top brand mark + compact toggle
+        JPanel top = transparent(new BorderLayout(0, 6));
         if (compact) {
             JPanel logoWrap = transparent(new FlowLayout(FlowLayout.CENTER, 0, 0));
             logoWrap.add(branding.logo(BrandingManager.EMBLEM, 38, 30, BrandConstants.PRODUCT));
             top.add(logoWrap, BorderLayout.NORTH);
             JPanel toggleWrap = transparent(new FlowLayout(FlowLayout.CENTER, 0, 0));
-            toggleWrap.add(new RoyalIconButton(RoyalIcons.Glyph.EXPAND, toggleTooltip, 16, 36, onToggleCompact));
+            toggleWrap.add(new RoyalIconButton(RoyalIcons.Glyph.EXPAND, toggleTooltip, 15, 34, onToggleCompact));
             top.add(toggleWrap, BorderLayout.SOUTH);
         } else {
-            JPanel headerRow = transparent(new BorderLayout(4, 0));
-            headerRow.add(branding.logo(BrandingManager.GAME, 144, 78, BrandConstants.PRODUCT), BorderLayout.CENTER);
+            JPanel headerRow = transparent(new BorderLayout(2, 0));
+            headerRow.add(branding.logo(BrandingManager.GAME, 154, 84, BrandConstants.PRODUCT), BorderLayout.CENTER);
             JPanel btnWrap = transparent(new BorderLayout());
-            btnWrap.add(new RoyalIconButton(RoyalIcons.Glyph.COLLAPSE, toggleTooltip, 15, 30, onToggleCompact), BorderLayout.NORTH);
+            btnWrap.add(new RoyalIconButton(RoyalIcons.Glyph.COLLAPSE, toggleTooltip, 14, 28, onToggleCompact), BorderLayout.NORTH);
             headerRow.add(btnWrap, BorderLayout.EAST);
             top.add(headerRow, BorderLayout.CENTER);
-            top.add(divider(), BorderLayout.SOUTH);
         }
         add(top, BorderLayout.NORTH);
 
-        // Navigation menu items
-        JPanel menu = transparent(new GridLayout(0, 1, 0, 5));
+        // Navigation menu items (including About inline just like reference)
+        JPanel menu = transparent(new GridLayout(0, 1, 0, 4));
         for (Item item : items) {
             menu.add(new NavButton(item, item.id().equals(selectedId), compact));
         }
+        menu.add(new NavButton(new Item("ABOUT", aboutLabel, RoyalIcons.Glyph.ABOUT, onAbout), false, compact));
+
         JPanel navWrap = transparent(new BorderLayout());
         navWrap.add(menu, BorderLayout.NORTH);
         add(navWrap, BorderLayout.CENTER);
 
-        // Bottom player badge + About / Sign out
-        JPanel bottom = transparent(new BorderLayout(0, 8));
-        bottom.add(divider(), BorderLayout.NORTH);
+        // Bottom decorative Knight + subtle Sign Out control
         if (compact) {
-            JPanel compactFooter = transparent(new GridLayout(0, 1, 0, 6));
-            compactFooter.setBorder(new EmptyBorder(6, 0, 0, 0));
-            compactFooter.add(centered(new RoyalIconButton(RoyalIcons.Glyph.ABOUT, aboutLabel, 16, 36, onAbout)));
-            var signOutBtn = new RoyalIconButton(RoyalIcons.Glyph.SIGN_OUT, signOutLabel, 16, 36, onSignOut);
-            signOutBtn.setDanger(false);
-            compactFooter.add(centered(signOutBtn));
-            bottom.add(compactFooter, BorderLayout.CENTER);
+            JPanel compactFooter = transparent(new FlowLayout(FlowLayout.CENTER, 0, 4));
+            compactFooter.add(new RoyalIconButton(RoyalIcons.Glyph.SIGN_OUT, signOutLabel, 16, 36, onSignOut));
+            add(compactFooter, BorderLayout.SOUTH);
         } else {
-            JPanel profileBadge = new RoyalPanel(new BorderLayout(8, 0), new Color(0x19171D), new Color(0x141317),
-                    new Color(0x30281D), 12);
-            profileBadge.setBorder(new EmptyBorder(8, 10, 8, 10));
-            JLabel crown = new JLabel(RoyalIcons.icon(RoyalIcons.Glyph.CROWN, 16, GOLD));
-            JLabel name = new JLabel(playerName);
-            name.setForeground(PALE);
-            name.setFont(sans(Font.BOLD, 13f));
-            name.setToolTipText(playerName);
-            profileBadge.add(crown, BorderLayout.WEST);
-            profileBadge.add(name, BorderLayout.CENTER);
-
-            JPanel actions = transparent(new GridLayout(0, 1, 0, 5));
-            var aboutBtn = new RoyalButton(aboutLabel, RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.ABOUT, onAbout);
-            aboutBtn.setHorizontalAlignment(SwingConstants.LEFT);
-            aboutBtn.setBorder(new EmptyBorder(7, 12, 7, 12));
-            aboutBtn.setFont(sans(Font.BOLD, 12.5f));
-            aboutBtn.setMinimumSize(new Dimension(42, 32));
-            var outBtn = new RoyalButton(signOutLabel, RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.SIGN_OUT, onSignOut);
-            outBtn.setHorizontalAlignment(SwingConstants.LEFT);
-            outBtn.setBorder(new EmptyBorder(7, 12, 7, 12));
-            outBtn.setFont(sans(Font.BOLD, 12.5f));
-            outBtn.setMinimumSize(new Dimension(42, 32));
-            actions.add(aboutBtn);
-            actions.add(outBtn);
-
-            JPanel footerStack = transparent(new BorderLayout(0, 8));
-            footerStack.setBorder(new EmptyBorder(6, 0, 0, 0));
-            footerStack.add(profileBadge, BorderLayout.NORTH);
-            footerStack.add(actions, BorderLayout.SOUTH);
-            bottom.add(footerStack, BorderLayout.CENTER);
+            JPanel ornamentFooter = new JPanel(new BorderLayout(0, 4)) {
+                @Override protected void paintComponent(Graphics graphics) {
+                    Graphics2D g = (Graphics2D) graphics.create();
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    int w = getWidth(), h = getHeight();
+                    // Warm golden floor aura behind decorative knight
+                    RoyalGlowEffect.paintAmbientSpotlight(g, w * 0.44f, h * 0.84f, w * 0.62f, new Color(224, 178, 66, 76));
+                    int kh = Math.min(h - 6, 134);
+                    int kw = Math.min(w - 16, 126);
+                    assets.drawPieceFitted(g, Piece.of(Side.BLACK, Kind.KNIGHT), (w - kw) / 2 - 12, h - kh - 2, kw, kh);
+                    g.dispose();
+                }
+            };
+            ornamentFooter.setOpaque(false);
+            ornamentFooter.setPreferredSize(new Dimension(180, 138));
+            JPanel signOutRow = transparent(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+            RoyalIconButton outIcon = new RoyalIconButton(RoyalIcons.Glyph.SIGN_OUT,
+                    playerName + " · " + signOutLabel, 15, 32, onSignOut);
+            signOutRow.add(outIcon);
+            ornamentFooter.add(signOutRow, BorderLayout.SOUTH);
+            add(ornamentFooter, BorderLayout.SOUTH);
         }
-        add(bottom, BorderLayout.SOUTH);
-    }
-
-    private static JPanel centered(Component c) {
-        JPanel wrap = transparent(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        wrap.add(c);
-        return wrap;
     }
 
     @Override protected void paintComponent(Graphics graphics) {
         Graphics2D g = (Graphics2D) graphics.create();
-        g.setPaint(new GradientPaint(0, 0, new Color(0x131216), 0, getHeight(), new Color(0x0D0C0F)));
-        g.fillRect(0, 0, getWidth(), getHeight());
+        int w = getWidth(), h = getHeight();
+        // Translucent obsidian-bronze glass backdrop
+        g.setPaint(new GradientPaint(0, 0, new Color(16, 14, 15, 232), 0, h, new Color(11, 10, 12, 240)));
+        g.fillRect(0, 0, w, h);
+
+        // Luminous metallic gold vertical right border (signature reference line)
+        g.setPaint(new LinearGradientPaint(0, 0, 0, h,
+                new float[]{0f, 0.30f, 0.72f, 1f},
+                new Color[]{new Color(196, 152, 58, 120), new Color(242, 210, 118, 220),
+                        new Color(186, 142, 52, 165), new Color(245, 212, 118, 215)}));
+        g.fillRect(w - 2, 0, 2, h);
+        // Soft warm inward golden reflection beside the border
+        g.setPaint(new GradientPaint(w - 14, 0, new Color(212, 175, 55, 0), w - 2, 0, new Color(212, 175, 55, 26)));
+        g.fillRect(w - 14, 0, 12, h);
         g.dispose();
     }
 
     private static final class NavButton extends JButton {
         private final RoyalIcons.Glyph glyph;
         private final boolean selected;
-        private final boolean compact;
 
         NavButton(Item item, boolean selected, boolean compact) {
             super(compact ? "" : item.label());
             this.glyph = item.glyph();
             this.selected = selected;
-            this.compact = compact;
             setToolTipText(item.label());
             getAccessibleContext().setAccessibleName(item.label());
             setOpaque(false);
@@ -129,13 +122,13 @@ final class RoyalNavigationPanel extends JPanel {
             setFocusPainted(false);
             setRolloverEnabled(true);
             setHorizontalAlignment(compact ? SwingConstants.CENTER : SwingConstants.LEFT);
-            setIconTextGap(11);
-            setBorder(compact ? new EmptyBorder(8, 0, 8, 0) : new EmptyBorder(9, 14, 9, 12));
+            setIconTextGap(12);
+            setBorder(compact ? new EmptyBorder(8, 0, 8, 0) : new EmptyBorder(9, 14, 9, 10));
             setFont(sans(selected ? Font.BOLD : Font.PLAIN, 13.5f));
-            setForeground(selected ? PALE : new Color(0xCFC9BE));
+            setForeground(selected ? IVORY : new Color(0xD8D1C4));
             setPreferredSize(new Dimension(compact ? 46 : 182, 38));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            setIcon(RoyalIcons.icon(glyph, 17, selected ? GOLD : MUTED));
+            setIcon(RoyalIcons.icon(glyph, 17, selected ? PALE : new Color(0xD7B359)));
             addActionListener(e -> item.action().run());
         }
 
@@ -145,19 +138,18 @@ final class RoyalNavigationPanel extends JPanel {
             int w = getWidth(), h = getHeight();
             boolean hover = getModel().isRollover();
             if (selected) {
-                g.setPaint(new GradientPaint(0, 0, new Color(212, 175, 55, 42), w, 0, new Color(212, 175, 55, 10)));
-                g.fillRoundRect(0, 0, w, h, 10, 10);
-                g.setColor(new Color(212, 175, 55, 85));
-                g.drawRoundRect(0, 0, w - 1, h - 1, 10, 10);
-                // Metallic gold active indicator bar on the left
-                g.setPaint(new GradientPaint(0, 6, PALE, 0, h - 6, GOLD));
-                g.fillRoundRect(2, 7, 3, h - 14, 3, 3);
+                RoyalGlowEffect.paintOuterGlow(g, 2, 2, w - 4, h - 4, 11, new Color(235, 188, 72, 95), 2);
+                g.setPaint(new GradientPaint(0, 0, new Color(186, 140, 44, 96), w, h, new Color(76, 56, 18, 62)));
+                g.fillRoundRect(1, 1, w - 2, h - 2, 11, 11);
+                RoyalGlowEffect.paintMetallicGoldBorder(g, 1, 1, w - 2, h - 2, 11, 1.5f, true);
             } else if (hover) {
-                g.setColor(new Color(255, 245, 220, 14));
-                g.fillRoundRect(0, 0, w, h, 10, 10);
+                g.setColor(new Color(212, 175, 55, 24));
+                g.fillRoundRect(1, 1, w - 2, h - 2, 11, 11);
+                g.setColor(new Color(212, 175, 55, 72));
+                g.drawRoundRect(1, 1, w - 3, h - 3, 11, 11);
             }
-            setIcon(RoyalIcons.icon(glyph, 17, selected ? GOLD : hover ? PALE : MUTED));
-            setForeground(selected ? PALE : hover ? IVORY : new Color(0xC8C2B8));
+            setIcon(RoyalIcons.icon(glyph, 17, selected ? PALE : hover ? PALE : new Color(0xD4AF4E)));
+            setForeground(selected ? IVORY : hover ? PALE : new Color(0xD8D1C4));
             g.dispose();
             super.paintComponent(graphics);
         }

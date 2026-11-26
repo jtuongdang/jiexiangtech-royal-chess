@@ -11,73 +11,115 @@ import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 final class RoyalPlayerCard extends JPanel {
     private final Side side;
     private final RoyalGameClock clock = new RoyalGameClock();
-    private final JLabel turnPill;
     private final JLabel nameLabel;
+    private final JLabel ratingLabel;
+    private final JComponent activeDot;
     private boolean activeTurn;
     private boolean inCheck;
 
-    RoyalPlayerCard(AssetManager assets, Side side, String playerName, String roleLabel, String turnLabel) {
-        super(new BorderLayout(12, 0));
+    RoyalPlayerCard(AssetManager assets, Side side, String playerName, String badgeText, boolean isAi, String ratingText) {
+        super(new BorderLayout(11, 0));
         this.side = side;
         setOpaque(false);
-        setBorder(new EmptyBorder(8, 14, 8, 12));
+        setBorder(new EmptyBorder(10, 16, 10, 12));
+        setPreferredSize(new Dimension(340, 72));
+        setMinimumSize(new Dimension(280, 68));
 
-        // Left side medallion with actual piece sprite
+        // Circular Royal Avatar Medallion (with double metallic gold ring)
         JComponent avatar = new JComponent() {
             {
-                setPreferredSize(new Dimension(38, 38));
-                setMinimumSize(new Dimension(38, 38));
+                setPreferredSize(new Dimension(48, 48));
+                setMinimumSize(new Dimension(48, 48));
             }
             @Override protected void paintComponent(Graphics graphics) {
                 Graphics2D g = (Graphics2D) graphics.create();
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
                 int w = getWidth(), h = getHeight();
-                Color bgTop = side == Side.WHITE ? new Color(0x2D2820) : new Color(0x1E1C21);
-                Color bgBot = side == Side.WHITE ? new Color(0x1D1A15) : new Color(0x111014);
-                g.setPaint(new GradientPaint(0, 0, bgTop, 0, h, bgBot));
-                g.fillOval(1, 1, w - 2, h - 2);
-                if (side == Side.BLACK) {
-                    g.setPaint(new RadialGradientPaint(w / 2f, h / 2f, w * 0.48f,
-                            new float[]{0f, 1f}, new Color[]{new Color(228, 192, 102, 82), new Color(0, 0, 0, 0)}));
-                    g.fillOval(2, 2, w - 4, h - 4);
-                }
-                g.setColor(activeTurn ? GOLD : LINE_GOLD);
-                g.setStroke(new BasicStroke(activeTurn ? 1.8f : 1.1f));
-                g.drawOval(1, 1, w - 3, h - 3);
-                assets.drawPieceFitted(g, Piece.of(side, Kind.KING), 6, 4, w - 12, h - 8);
+                Color top = side == Side.WHITE ? new Color(0x46371F) : new Color(0x272226);
+                Color bot = side == Side.WHITE ? new Color(0x1E180F) : new Color(0x121115);
+                g.setPaint(new GradientPaint(0, 0, top, 0, h, bot));
+                g.fillOval(2, 2, w - 4, h - 4);
+
+                // Radiant warm portrait backdrop inside circle so both black & white emblems pop cleanly
+                RoyalGlowEffect.paintAmbientSpotlight(g, w / 2f, h * 0.48f, w * 0.46f,
+                        side == Side.WHITE ? new Color(248, 220, 134, 92) : new Color(224, 186, 94, 98));
+                assets.drawPieceFitted(g, Piece.of(side, Kind.KING), 8, 5, w - 16, h - 10);
+
+                // Ornate metallic gold avatar ring
+                g.setPaint(new LinearGradientPaint(0, 0, w, h,
+                        new float[]{0f, 0.5f, 1f},
+                        activeTurn ? new Color[]{new Color(0xFFF0BC), GOLD, new Color(0xF6DA88)}
+                                : new Color[]{new Color(0xB89242), new Color(0x5E4922), new Color(0x9E7A32)}));
+                g.setStroke(new BasicStroke(activeTurn ? 2.2f : 1.5f));
+                g.drawOval(2, 2, w - 5, h - 5);
                 g.dispose();
             }
         };
 
         nameLabel = new JLabel(playerName);
         nameLabel.setForeground(IVORY);
-        nameLabel.setFont(sans(Font.BOLD, 14.5f));
+        nameLabel.setFont(sans(Font.BOLD, 13.5f));
 
-        JLabel roleBadge = pill(roleLabel, new Color(0x211E24), new Color(0x3B3224), MUTED);
-        turnPill = pill(turnLabel, new Color(212, 175, 55, 36), new Color(212, 175, 55, 165), PALE);
-        turnPill.setVisible(false);
+        JLabel rolePill = pill(badgeText,
+                isAi ? new Color(0xE0B94D) : new Color(212, 175, 55, 36),
+                isAi ? new Color(0xF7DF9B) : new Color(212, 175, 55, 135),
+                isAi ? BG : PALE);
+        rolePill.setBorder(new EmptyBorder(1, 6, 1, 6));
+        rolePill.setFont(sans(Font.BOLD, 10f));
 
-        JPanel metaRow = transparent(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        metaRow.add(roleBadge);
-        metaRow.add(turnPill);
+        activeDot = new JComponent() {
+            {
+                setPreferredSize(new Dimension(11, 11));
+                setMaximumSize(new Dimension(11, 11));
+                setMinimumSize(new Dimension(11, 11));
+            }
+            @Override protected void paintComponent(Graphics graphics) {
+                if (!activeTurn) return;
+                Graphics2D g = (Graphics2D) graphics.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color c = inCheck ? ERROR_TEXT : new Color(0x5AE084);
+                g.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 95));
+                g.fillOval(0, 0, 11, 11);
+                g.setColor(c);
+                g.fillOval(2, 2, 7, 7);
+                g.dispose();
+            }
+        };
 
-        JPanel textCol = transparent(new BorderLayout(0, 3));
-        textCol.add(nameLabel, BorderLayout.NORTH);
-        textCol.add(metaRow, BorderLayout.SOUTH);
+        JPanel nameRow = transparent(null);
+        nameRow.setLayout(new BoxLayout(nameRow, BoxLayout.X_AXIS));
+        nameRow.add(nameLabel);
+        nameRow.add(Box.createHorizontalStrut(6));
+        nameRow.add(rolePill);
+        nameRow.add(Box.createHorizontalStrut(6));
+        nameRow.add(activeDot);
+
+        ratingLabel = new JLabel(ratingText);
+        ratingLabel.setForeground(new Color(0xB8AE9E));
+        ratingLabel.setFont(sans(Font.PLAIN, 12.5f));
+
+        JPanel center = transparent(new GridBagLayout());
+        GridBagConstraints cc = new GridBagConstraints();
+        cc.gridx = 0; cc.gridy = 0; cc.weightx = 1; cc.anchor = GridBagConstraints.WEST; cc.fill = GridBagConstraints.HORIZONTAL;
+        center.add(nameRow, cc);
+        cc.gridy = 1; cc.insets = new Insets(2, 0, 0, 0);
+        center.add(ratingLabel, cc);
+
+        JPanel clockWrap = transparent(new GridBagLayout());
+        clockWrap.add(clock);
 
         add(avatar, BorderLayout.WEST);
-        add(textCol, BorderLayout.CENTER);
-        add(clock, BorderLayout.EAST);
+        add(center, BorderLayout.CENTER);
+        add(clockWrap, BorderLayout.EAST);
     }
 
-    void update(String clockText, boolean timed, boolean active, boolean lowTime, boolean check, String turnBadgeText) {
+    void update(String clockText, boolean timed, boolean active, boolean lowTime, boolean check, String ratingOverride) {
         this.activeTurn = active;
         this.inCheck = active && check;
-        turnPill.setText(turnBadgeText);
-        turnPill.setVisible(active);
-        turnPill.setForeground(inCheck ? ERROR_TEXT : PALE);
-        nameLabel.setForeground(active ? IVORY : new Color(0xC2BCB2));
+        if (ratingOverride != null) ratingLabel.setText(ratingOverride);
+        nameLabel.setForeground(active ? IVORY : new Color(0xC6C0B6));
+        ratingLabel.setForeground(inCheck ? ERROR_TEXT : active ? new Color(0xE2CFA0) : new Color(0x9E9689));
         clock.update(clockText, timed, active, lowTime);
         repaint();
     }
@@ -86,22 +128,35 @@ final class RoyalPlayerCard extends JPanel {
         Graphics2D g = (Graphics2D) graphics.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int w = getWidth(), h = getHeight();
-        Color top = activeTurn ? new Color(0x211D16) : new Color(0x161519);
-        Color bottom = activeTurn ? new Color(0x151310) : new Color(0x111014);
-        g.setPaint(new GradientPaint(0, 0, top, 0, h, bottom));
-        g.fillRoundRect(0, 0, w, h, 14, 14);
+        int cardX = 8, cardW = w - 8;
 
         if (activeTurn) {
-            // Subtle active gold left bar + ambient glow
-            g.setPaint(new GradientPaint(0, 0, inCheck ? new Color(220, 65, 55, 48) : new Color(212, 175, 55, 34),
-                    w * 0.45f, 0, new Color(0, 0, 0, 0)));
-            g.fillRoundRect(0, 0, w, h, 14, 14);
-            g.setColor(inCheck ? ERROR_TEXT : GOLD);
-            g.fillRoundRect(2, 10, 3, h - 20, 3, 3);
+            RoyalGlowEffect.paintOuterGlow(g, cardX + 1, 2, cardW - 2, h - 4, 14,
+                    inCheck ? new Color(225, 65, 58, 120) : new Color(235, 190, 72, 115), 3);
+            g.setPaint(new LinearGradientPaint(cardX, 0, w, h,
+                    new float[]{0f, 0.45f, 1f},
+                    inCheck
+                            ? new Color[]{new Color(96, 30, 28, 225), new Color(46, 20, 20, 228), new Color(28, 16, 18, 232)}
+                            : new Color[]{new Color(122, 92, 32, 205), new Color(56, 42, 18, 222), new Color(28, 23, 16, 232)}));
+            g.fillRoundRect(cardX, 2, cardW - 2, h - 4, 14, 14);
+            // Subtle warm inner top reflection
+            g.setColor(new Color(255, 240, 192, 48));
+            g.drawLine(cardX + 14, 3, w - 16, 3);
+            if (inCheck) {
+                g.setColor(new Color(235, 86, 76, 210));
+                g.setStroke(new BasicStroke(1.8f));
+                g.drawRoundRect(cardX, 2, cardW - 3, h - 5, 14, 14);
+            } else {
+                RoyalGlowEffect.paintMetallicGoldBorder(g, cardX, 2, cardW - 2, h - 4, 14, 1.8f, true);
+            }
+            // Signature glowing gold crown indicator at left edge of active player card
+            RoyalIcons.draw(g, RoyalIcons.Glyph.CROWN, 0, (h - 16) / 2, 15, inCheck ? ERROR_TEXT : PALE);
+        } else {
+            g.setPaint(new GradientPaint(cardX, 0, new Color(23, 21, 25, 222), cardX, h, new Color(15, 14, 17, 232)));
+            g.fillRoundRect(cardX, 2, cardW - 2, h - 4, 14, 14);
+            g.setColor(new Color(92, 74, 44, 130));
+            g.drawRoundRect(cardX, 2, cardW - 3, h - 5, 14, 14);
         }
-
-        g.setColor(inCheck ? new Color(220, 75, 65, 190) : activeTurn ? new Color(212, 175, 55, 155) : LINE);
-        g.drawRoundRect(0, 0, w - 1, h - 1, 14, 14);
         g.dispose();
     }
 }

@@ -21,10 +21,9 @@ final class MatchView extends JPanel {
     private final ChessBoardPanel board;
     private final RoyalMoveHistory moveHistory;
     private final RoyalCapturedTray captures;
-    private final JLabel statusPill;
     private final JLabel saveStatus = caption(" ");
     private final RoyalPlayerCard whiteCard, blackCard;
-    private final JPanel boardArea;
+    private final JPanel playersStack;
     private final RoyalButton saveBtn, undo, hint, resign, draw, sound, flipBtn, fullscreenBtn, pauseBtn;
     private final Timer tick;
     private boolean active = true, soundEnabled, leaving, endDisplayed, flipped;
@@ -39,100 +38,100 @@ final class MatchView extends JPanel {
         this.prefs = frame.prefs();
         this.soundEnabled = prefs.sound();
         setOpaque(false);
-        setBorder(new EmptyBorder(12, 16, 12, 18));
+        setBorder(new EmptyBorder(8, 12, 10, 16));
+
+        // =====================================================================
+        // CENTER CHESSBOARD STAGE (~55%): JIEXIANGTECH horizontal header + Large Framed Board
+        // =====================================================================
+        JPanel centerStage = transparent(new BorderLayout(0, 4));
+        JPanel brandHeader = transparent(new FlowLayout(FlowLayout.CENTER, 0, 2));
+        brandHeader.add(frame.branding().logo(BrandingManager.COMPANY_HORIZONTAL, 224, 44,
+                BrandConstants.COMPANY + " " + BrandConstants.COMPANY_CHINESE));
+        centerStage.add(brandHeader, BorderLayout.NORTH);
 
         board = new ChessBoardPanel(frame.assets(), prefs, session.options().theme(), this::canPlay,
                 options -> promote(this, frame.assets(), text, session.game().position().turn()), this::play);
         flipped = flip(prefs, session.options().human());
         board.setFlipped(flipped);
+        centerStage.add(board, BorderLayout.CENTER);
+        add(centerStage, BorderLayout.CENTER);
 
-        // Player info cards anchored closely to the board stage
-        whiteCard = new RoyalPlayerCard(frame.assets(), Side.WHITE,
-                frame.playerName(session.options(), Side.WHITE), text.get("side.WHITE"), text.get("activeTurn"));
-        blackCard = new RoyalPlayerCard(frame.assets(), Side.BLACK,
-                frame.playerName(session.options(), Side.BLACK), text.get("side.BLACK"), text.get("activeTurn"));
+        // =====================================================================
+        // RIGHT GAME PANEL (~30%): Both Player Cards + Move History + Captured + Controls
+        // =====================================================================
+        JPanel rightPanel = transparent(new BorderLayout(0, 10));
+        rightPanel.setPreferredSize(new Dimension(358, 560));
+        rightPanel.setMinimumSize(new Dimension(308, 460));
+        rightPanel.setBorder(new EmptyBorder(8, 0, 4, 0));
 
-        boardArea = transparent(new BorderLayout(0, 6));
+        // 1. Player Cards (Black + White stacked at top of Right Panel)
+        whiteCard = buildPlayerCard(Side.WHITE);
+        blackCard = buildPlayerCard(Side.BLACK);
+        playersStack = transparent(new GridLayout(2, 1, 0, 8));
         placePlayers();
-        boardArea.add(board, BorderLayout.CENTER);
-        add(boardArea, BorderLayout.CENTER);
+        rightPanel.add(playersStack, BorderLayout.NORTH);
 
-        // Right cohesive luxury command panel
-        RoyalPanel side = new RoyalPanel(new BorderLayout(0, 12), new Color(0x19171D), new Color(0x121115), LINE, 16);
-        side.setPreferredSize(new Dimension(304, 520));
-        side.setMinimumSize(new Dimension(276, 420));
-        side.setBorder(new EmptyBorder(16, 16, 14, 16));
-
-        // Top match header & status pill
-        statusPill = pill(text.get("turn", text.get("side.WHITE")),
-                new Color(212, 175, 55, 34), new Color(212, 175, 55, 130), PALE);
-        JPanel titleRow = transparent(new BorderLayout(8, 0));
-        titleRow.add(title(text.get("game"), 22), BorderLayout.WEST);
-        titleRow.add(statusPill, BorderLayout.EAST);
-        JPanel overview = stack(
-                eyebrow(text.get("mode." + session.options().mode())),
-                Box.createVerticalStrut(4),
-                titleRow,
-                Box.createVerticalStrut(10),
-                divider());
-        side.add(overview, BorderLayout.NORTH);
-
-        // Center: custom move history + captured pieces tray
+        // 2. Move History (flexible center card)
         moveHistory = new RoyalMoveHistory(text, null);
+        rightPanel.add(moveHistory, BorderLayout.CENTER);
+
+        // 3. Lower Stack: Captured Pieces + Reference-Matched Control Grid
         captures = new RoyalCapturedTray(frame.assets(), text);
 
-        JPanel movesHeader = transparent(new BorderLayout());
-        movesHeader.add(eyebrow(text.get("moves")), BorderLayout.WEST);
-        JPanel movesSection = transparent(new BorderLayout(0, 6));
-        movesSection.add(movesHeader, BorderLayout.NORTH);
-        movesSection.add(moveHistory, BorderLayout.CENTER);
-
-        JPanel capturedSection = transparent(new BorderLayout(0, 6));
-        capturedSection.setBorder(new EmptyBorder(8, 0, 0, 0));
-        capturedSection.add(eyebrow(text.get("capture")), BorderLayout.NORTH);
-        capturedSection.add(captures, BorderLayout.CENTER);
-
-        JPanel centerStack = transparent(new BorderLayout(0, 4));
-        centerStack.add(movesSection, BorderLayout.CENTER);
-        centerStack.add(capturedSection, BorderLayout.SOUTH);
-        side.add(centerStack, BorderLayout.CENTER);
-
-        // South: hierarchical action buttons
-        saveBtn = compactAction(text.get("save"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.SAVE, () -> {
+        saveBtn = gameControl(text.get("save"), RoyalButton.Variant.GOLD_GLOW, RoyalIcons.Glyph.SAVE, () -> {
             if (!leaving) persist(true, null);
         });
-        undo = compactAction(text.get("undo"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO, this::undo);
-        hint = compactAction(text.get("hint"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HINT, this::hint);
-        draw = compactAction(text.get("draw"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.DRAW, this::draw);
-        flipBtn = compactAction(text.get("flip"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.FLIP, this::flipBoard);
-        sound = compactAction(text.get(soundEnabled ? "soundOn" : "soundOff"), RoyalButton.Variant.SECONDARY,
+        undo = gameControl(text.get("undo"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO, this::undo);
+        hint = gameControl(text.get("hint"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HINT, this::hint);
+        draw = gameControl(text.get("draw"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.DRAW, this::draw);
+        resign = gameControl(text.get("resign"), RoyalButton.Variant.DANGER, RoyalIcons.Glyph.RESIGN, this::resign);
+        flipBtn = gameControl(text.get("flip"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.FLIP, this::flipBoard);
+        sound = gameControl(text.get(soundEnabled ? "soundOn" : "soundOff"), RoyalButton.Variant.SECONDARY,
                 soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF, this::sound);
-        fullscreenBtn = compactAction(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
+        fullscreenBtn = gameControl(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
                 RoyalIcons.Glyph.FULLSCREEN, frame::toggleFullscreen);
-        resign = compactAction(text.get("resign"), RoyalButton.Variant.DANGER, RoyalIcons.Glyph.RESIGN, this::resign);
-        pauseBtn = compactAction(text.get("pause"), RoyalButton.Variant.GHOST, RoyalIcons.Glyph.PAUSE, frame::home);
+        pauseBtn = gameControl(text.get("pause"), RoyalButton.Variant.GHOST, RoyalIcons.Glyph.PAUSE, frame::home);
+        pauseBtn.setPreferredSize(new Dimension(120, 32));
 
-        JPanel actionGrid = transparent(new GridLayout(4, 2, 7, 7));
-        actionGrid.add(saveBtn);
-        actionGrid.add(undo);
-        actionGrid.add(hint);
-        actionGrid.add(draw);
-        actionGrid.add(flipBtn);
-        actionGrid.add(sound);
-        actionGrid.add(fullscreenBtn);
-        actionGrid.add(resign);
+        // Row 1: Save | Undo | Hint (3 equal columns)
+        JPanel row1 = transparent(new GridLayout(1, 3, 7, 0));
+        row1.add(saveBtn);
+        row1.add(undo);
+        row1.add(hint);
 
-        JPanel lower = transparent(new BorderLayout(0, 7));
-        JPanel statusLine = transparent(new BorderLayout());
-        statusLine.add(divider(), BorderLayout.NORTH);
-        saveStatus.setBorder(new EmptyBorder(6, 2, 0, 2));
-        statusLine.add(saveStatus, BorderLayout.SOUTH);
-        lower.add(statusLine, BorderLayout.NORTH);
-        lower.add(actionGrid, BorderLayout.CENTER);
-        lower.add(pauseBtn, BorderLayout.SOUTH);
-        side.add(lower, BorderLayout.SOUTH);
+        // Row 2: Draw (1/3) | Resign (2/3) — exact reference visual rhythm
+        JPanel row2 = transparent(new GridBagLayout());
+        GridBagConstraints rc = new GridBagConstraints();
+        rc.gridy = 0; rc.fill = GridBagConstraints.BOTH; rc.weighty = 1;
+        rc.gridx = 0; rc.weightx = 0.36; rc.insets = new Insets(0, 0, 0, 7);
+        row2.add(draw, rc);
+        rc.gridx = 1; rc.weightx = 0.64; rc.insets = new Insets(0, 0, 0, 0);
+        row2.add(resign, rc);
 
-        add(side, BorderLayout.EAST);
+        // Row 3: Flip Board | Sound On | Full Screen (3 equal columns)
+        JPanel row3 = transparent(new GridLayout(1, 3, 7, 0));
+        row3.add(flipBtn);
+        row3.add(sound);
+        row3.add(fullscreenBtn);
+
+        // Row 4: Save status + Pause & Return
+        JPanel row4 = transparent(new BorderLayout(8, 0));
+        saveStatus.setBorder(new EmptyBorder(0, 4, 0, 4));
+        row4.add(saveStatus, BorderLayout.WEST);
+        row4.add(pauseBtn, BorderLayout.CENTER);
+
+        JPanel controls = transparent(new GridLayout(0, 1, 0, 7));
+        controls.add(row1);
+        controls.add(row2);
+        controls.add(row3);
+        controls.add(row4);
+
+        JPanel southStack = transparent(new BorderLayout(0, 10));
+        southStack.add(captures, BorderLayout.NORTH);
+        southStack.add(controls, BorderLayout.SOUTH);
+        rightPanel.add(southStack, BorderLayout.SOUTH);
+
+        add(rightPanel, BorderLayout.EAST);
 
         tick = new Timer(100, event -> onTick());
         tick.setCoalesce(true);
@@ -143,23 +142,56 @@ final class MatchView extends JPanel {
         computer();
     }
 
-    private static RoyalButton compactAction(String label, RoyalButton.Variant variant, RoyalIcons.Glyph glyph, Runnable action) {
+    private RoyalPlayerCard buildPlayerCard(Side side) {
+        MatchOptions opts = session.options();
+        boolean isComputer = opts.mode() == MatchOptions.Mode.COMPUTER && opts.human() != side;
+        String sideName = text.get("side." + side);
+        String name;
+        String badge;
+        int elo;
+        if (opts.mode() == MatchOptions.Mode.COMPUTER) {
+            if (isComputer) {
+                name = sideName + " (" + text.get("level." + opts.level()) + ")";
+                badge = text.get("badgeAi");
+                elo = switch (opts.level()) {
+                    case EASY -> 900;
+                    case MEDIUM -> 1350;
+                    case HARD -> 1750;
+                    case EXPERT -> 2150;
+                };
+            } else {
+                name = sideName + " (" + frame.displayLabel() + ")";
+                badge = text.get("badgeYou");
+                elo = frame.currentRating();
+            }
+        } else {
+            name = sideName;
+            badge = text.get("badgeLocal");
+            elo = frame.currentRating();
+        }
+        return new RoyalPlayerCard(frame.assets(), side, name, badge, isComputer, text.get("elo", String.valueOf(elo)));
+    }
+
+    private static RoyalButton gameControl(String label, RoyalButton.Variant variant, RoyalIcons.Glyph glyph, Runnable action) {
         RoyalButton btn = new RoyalButton(label, variant, glyph, action);
-        btn.setBorder(new EmptyBorder(7, 10, 7, 10));
-        btn.setFont(sans(Font.BOLD, 12.5f));
-        btn.setMinimumSize(new Dimension(42, 34));
+        btn.setBorder(new EmptyBorder(8, 8, 8, 8));
+        btn.setFont(sans(Font.BOLD, 12f));
+        btn.setIconTextGap(6);
+        btn.setMinimumSize(new Dimension(42, 36));
+        btn.setPreferredSize(new Dimension(96, 36));
+        btn.setToolTipText(label);
         return btn;
     }
 
     GameSession session() { return session; }
+    ChessBoardPanel boardPanel() { return board; }
 
     private void placePlayers() {
-        boardArea.remove(whiteCard);
-        boardArea.remove(blackCard);
-        boardArea.add(flipped ? whiteCard : blackCard, BorderLayout.NORTH);
-        boardArea.add(flipped ? blackCard : whiteCard, BorderLayout.SOUTH);
-        boardArea.revalidate();
-        boardArea.repaint();
+        playersStack.removeAll();
+        playersStack.add(flipped ? whiteCard : blackCard);
+        playersStack.add(flipped ? blackCard : whiteCard);
+        playersStack.revalidate();
+        playersStack.repaint();
     }
 
     private void flipBoard() {
@@ -206,15 +238,6 @@ final class MatchView extends JPanel {
         moveHistory.update(game, game.plyCount());
         captures.update(game, game.plyCount());
 
-        Side turn = game.position().turn();
-        boolean inCheck = game.outcome() == null && Rules.inCheck(game.position(), turn);
-        String color = text.get("side." + turn);
-        String statusText = game.outcome() != null ? text.get("reason." + game.outcome().reason())
-                : session.computerTurn() ? text.get("thinking")
-                : text.get(inCheck ? "check" : "turn", color);
-        statusPill.setText(statusText);
-        statusPill.setForeground(inCheck ? ERROR_TEXT : PALE);
-
         undo.setEnabled(session.canUndo());
         hint.setEnabled(canPlay());
         resign.setEnabled(game.outcome() == null);
@@ -229,11 +252,16 @@ final class MatchView extends JPanel {
         boolean ongoing = game.outcome() == null;
         boolean inCheck = ongoing && Rules.inCheck(game.position(), turn);
         boolean timed = session.options().timed();
-        String badge = inCheck ? text.get("inCheckBadge") : text.get("activeTurn");
+
+        String whiteSub = ongoing && session.computerTurn() && turn == Side.WHITE ? text.get("thinking")
+                : inCheck && turn == Side.WHITE ? text.get("inCheckBadge") : null;
+        String blackSub = ongoing && session.computerTurn() && turn == Side.BLACK ? text.get("thinking")
+                : inCheck && turn == Side.BLACK ? text.get("inCheckBadge") : null;
+
         whiteCard.update(timed ? clock(times.whiteMillis()) : "—", timed, ongoing && turn == Side.WHITE,
-                timed && times.whiteMillis() <= 30_000L, inCheck && turn == Side.WHITE, badge);
+                timed && times.whiteMillis() <= 30_000L, inCheck && turn == Side.WHITE, whiteSub);
         blackCard.update(timed ? clock(times.blackMillis()) : "—", timed, ongoing && turn == Side.BLACK,
-                timed && times.blackMillis() <= 30_000L, inCheck && turn == Side.BLACK, badge);
+                timed && times.blackMillis() <= 30_000L, inCheck && turn == Side.BLACK, blackSub);
     }
 
     private void computer() {
@@ -271,8 +299,8 @@ final class MatchView extends JPanel {
                     if (result == null) return;
                     if (showingHint) {
                         board.showHint(result.move());
-                        statusPill.setText(text.get("hintMove", San.format(position, result.move())));
-                        statusPill.setForeground(SUCCESS);
+                        saveStatus.setForeground(SUCCESS);
+                        saveStatus.setText(text.get("hintMove", San.format(position, result.move())));
                     } else play(result.move());
                 } catch (CancellationException ignored) {
                     // A newer action owns the board.
@@ -385,11 +413,24 @@ final class MatchView extends JPanel {
         endDisplayed = true;
         tick.stop();
         cancelSearch();
+        Outcome outcome = session.game().outcome();
         if (soundEnabled) frame.sounds().play("result");
-        if (session.game().outcome().winner() != null) board.celebrate();
+        if (outcome.winner() != null) board.celebrate();
+        boolean isDraw = outcome.winner() == null;
+        boolean isVictory = !isDraw && (session.options().mode() == MatchOptions.Mode.LOCAL || outcome.winner() == session.options().human());
+        Color accent = isDraw ? new Color(0xD8DCE4) : isVictory ? PALE : DANGER_TEXT;
+        String headline = isDraw ? text.get("draw")
+                : session.options().mode() == MatchOptions.Mode.LOCAL ? text.get("winner", text.get("side." + outcome.winner()))
+                : text.get(isVictory ? "victory" : "defeat");
+        board.showOutcomeOverlay(headline, text.get("reason." + outcome.reason()), accent);
+
         var snapshot = session.snapshot();
         frame.save(snapshot, receipt -> {
-            if (active && !leaving) frame.result(this, snapshot, receipt);
+            if (active && !leaving) {
+                Timer delay = new Timer(950, e -> { if (active && !leaving) frame.result(this, snapshot, receipt); });
+                delay.setRepeats(false);
+                delay.start();
+            }
         }, failure -> {
             if (active && !leaving) {
                 frame.error("saveError", failure);

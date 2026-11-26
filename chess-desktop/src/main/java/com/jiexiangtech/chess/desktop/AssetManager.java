@@ -37,7 +37,8 @@ final class AssetManager {
         }
         for (String name : List.of("board", "board-grid", "tile-light", "tile-dark")) load("board/" + name + ".png");
         for (String path : List.of(BrandingManager.SPLASH, BrandingManager.LOGIN, BrandingManager.DASHBOARD,
-                BrandingManager.GAME, BrandingManager.COMPANY, BrandingManager.EMBLEM, "branding/app-icon.png")) {
+                BrandingManager.GAMEPLAY_BG, BrandingManager.GAME, BrandingManager.COMPANY,
+                BrandingManager.COMPANY_HORIZONTAL, BrandingManager.EMBLEM, "branding/app-icon.png")) {
             load(path, "assets/" + path);
         }
         for (int size : new int[]{16, 32, 64, 128, 256, 512}) {
