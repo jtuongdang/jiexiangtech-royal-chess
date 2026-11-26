@@ -161,7 +161,7 @@ final class ChessBoardPanel extends JPanel {
     @Override public void removeNotify() { animator.stop(); super.removeNotify(); }
 
     private int hitSquare(double px, double py) {
-        return activeRenderer.squareAt(getWidth(), getHeight(), flipped, px, py, position, preferences.pieceScale());
+        return activeRenderer.squareAt(getWidth(), getHeight(), flipped, px, py, position, preferences.pieceScale(), candidates);
     }
 
     private boolean isOwnPiece(int sq) {

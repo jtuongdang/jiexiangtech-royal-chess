@@ -86,6 +86,35 @@ class AssetsTest {
         });
     }
 
+    @Test void royalFocus25DSupportsClickToMoveOnRank2PawnsAndStepForwardTargets() throws Exception {
+        var assets = new AssetManager();
+        SwingUtilities.invokeAndWait(() -> {
+            java.util.List<Move> played = new java.util.ArrayList<>();
+            var board = new ChessBoardPanel(assets, Preferences.defaults("en"), "royal", () -> true, x -> null, played::add);
+            board.setFocusMode(true);
+            board.setSize(1080, 620);
+            Position pos = Position.initial();
+            board.update(pos, null, false);
+            var mapper = PerspectiveCoordinateMapper.fit(1080, 620, false);
+
+            // Click d2 pawn (even though d1 Queen stands in front of it) -> then click d3 (1 step ahead of d2)
+            var d2 = mapper.squareCenter(Square.at(3, 1));
+            var d3 = mapper.squareCenter(Square.at(3, 2));
+            clickAt(board, (int) Math.round(d2.x), (int) Math.round(d2.y));
+            clickAt(board, (int) Math.round(d3.x), (int) Math.round(d3.y));
+            assertEquals(1, played.size());
+            assertEquals(Move.uci("d2d3"), played.get(0));
+        });
+    }
+
+    private static void clickAt(ChessBoardPanel board, int x, int y) {
+        long now = System.currentTimeMillis();
+        board.dispatchEvent(new java.awt.event.MouseEvent(board, java.awt.event.MouseEvent.MOUSE_PRESSED,
+                now, java.awt.event.InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        board.dispatchEvent(new java.awt.event.MouseEvent(board, java.awt.event.MouseEvent.MOUSE_RELEASED,
+                now + 10, 0, x, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+    }
+
     @Test void vietnameseBundleContainsEveryEnglishKey() throws Exception {
         var english = new java.util.Properties();
         var vietnamese = new java.util.Properties();

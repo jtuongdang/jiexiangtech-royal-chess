@@ -16,5 +16,6 @@ interface BoardRenderer {
 
     void paint(Graphics2D g, RenderState state);
 
-    int squareAt(int width, int height, boolean flipped, double px, double py, Position position, int pieceScale);
+    int squareAt(int width, int height, boolean flipped, double px, double py,
+                 Position position, int pieceScale, List<Move> candidates);
 }

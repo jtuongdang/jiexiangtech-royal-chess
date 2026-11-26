@@ -33,8 +33,9 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
     }
 
     @Override
-    public int squareAt(int width, int height, boolean flipped, double px, double py, Position position, int pieceScale) {
-        return PerspectiveCoordinateMapper.fit(width, height, flipped).squareAt(px, py, position, pieceScale);
+    public int squareAt(int width, int height, boolean flipped, double px, double py,
+                        Position position, int pieceScale, java.util.List<Move> candidates) {
+        return PerspectiveCoordinateMapper.fit(width, height, flipped).squareAt(px, py, position, pieceScale, candidates);
     }
 
     @Override

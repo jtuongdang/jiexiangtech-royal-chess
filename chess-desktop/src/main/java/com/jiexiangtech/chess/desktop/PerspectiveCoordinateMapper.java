@@ -2,8 +2,10 @@ package com.jiexiangtech.chess.desktop;
 
 import java.awt.Rectangle;
 import java.awt.geom.Point2D;
+import com.jiexiangtech.chess.domain.Move;
 import com.jiexiangtech.chess.domain.Piece;
 import com.jiexiangtech.chess.domain.Position;
+import com.jiexiangtech.chess.domain.Rules;
 import com.jiexiangtech.chess.domain.Square;
 
 /**
@@ -130,24 +132,73 @@ final class PerspectiveCoordinateMapper {
     }
 
     int squareAt(double px, double py, Position position, int pieceScalePercent) {
-        if (position != null) {
-            double userScale = pieceScalePercent / 97.0;
-            for (int row = 7; row >= 0; row--) {
-                for (int col = 0; col < 8; col++) {
-                    int sq = flipped ? Square.at(7 - col, row) : Square.at(col, 7 - row);
-                    Piece piece = position.piece(sq);
-                    if (piece == null) continue;
-                    Point2D.Double anchor = squareAnchor(sq);
-                    double tileW = squareWidth(sq);
-                    double ph = tileW * 1.18 * RoyalPieceRenderer.heightRatio(piece.kind()) * userScale;
-                    double pw = tileW * 0.62 * userScale;
-                    if (px >= anchor.x - pw * 0.5 && px <= anchor.x + pw * 0.5
-                            && py >= anchor.y - ph && py <= anchor.y + tileW * 0.08) {
-                        return sq;
-                    }
+        return squareAt(px, py, position, pieceScalePercent, java.util.List.of());
+    }
+
+    /**
+     * Precision 2.5D hit-testing:
+     * 1. Any click landing on a legal candidate move's board square (or enemy piece body on a capture square)
+     *    resolves immediately to that candidate destination square (never blocked by the selected piece's head).
+     * 2. Any click landing on a board square containing one of the side-to-move's own movable pieces resolves
+     *    to that square (never stolen by a blocked piece standing in front of it, e.g. d1 Queen in front of d2 Pawn).
+     * 3. Clicking the protruding upper silhouette of a movable own piece selects that piece.
+     * 4. Falls back to exact inverse homography boardSquareAt(px, py).
+     */
+    int squareAt(double px, double py, Position position, int pieceScalePercent, java.util.List<Move> candidates) {
+        int planeSq = boardSquareAt(px, py);
+        if (position == null) return planeSq;
+
+        if (candidates != null && !candidates.isEmpty()) {
+            // 1a. Board-plane hit on any legal target square always wins
+            if (planeSq >= 0) {
+                for (Move m : candidates) {
+                    if (m.to() == planeSq) return planeSq;
+                }
+            }
+            // 1b. Clicking the upright body of an enemy piece on a legal capture square
+            for (Move m : candidates) {
+                int to = m.to();
+                Piece targetPiece = position.piece(to);
+                if (targetPiece != null && hitsPieceSilhouette(px, py, to, targetPiece, pieceScalePercent)) {
+                    return to;
                 }
             }
         }
-        return boardSquareAt(px, py);
+
+        // 2. If the board square directly under the cursor holds an own piece with legal moves, select it directly
+        if (planeSq >= 0) {
+            Piece onPlane = position.piece(planeSq);
+            if (onPlane != null && onPlane.side() == position.turn()
+                    && ! com.jiexiangtech.chess.domain.Rules.legalMoves(position, planeSq).isEmpty()) {
+                return planeSq;
+            }
+        }
+
+        // 3. Check protruding upright piece silhouettes (front-to-back) for movable own pieces first
+        for (int row = 7; row >= 0; row--) {
+            for (int col = 0; col < 8; col++) {
+                int sq = flipped ? Square.at(7 - col, row) : Square.at(col, 7 - row);
+                Piece piece = position.piece(sq);
+                if (piece == null || piece.side() != position.turn()) continue;
+                if (!com.jiexiangtech.chess.domain.Rules.legalMoves(position, sq).isEmpty()
+                        && hitsPieceSilhouette(px, py, sq, piece, pieceScalePercent)) {
+                    return sq;
+                }
+            }
+        }
+
+        return planeSq;
+    }
+
+    private boolean hitsPieceSilhouette(double px, double py, int sq, Piece piece, int pieceScalePercent) {
+        double userScale = pieceScalePercent / 97.0;
+        Point2D.Double anchor = squareAnchor(sq);
+        double tileW = squareWidth(sq);
+        double ph = tileW * 1.16 * RoyalPieceRenderer.heightRatio(piece.kind()) * userScale;
+        if (py < anchor.y - ph || py > anchor.y + tileW * 0.04) return false;
+        // Tapered silhouette width: wider near the base (0.54 * tileW), narrower near the crown (0.32 * tileW)
+        double t = Math.max(0.0, Math.min(1.0, (anchor.y - py) / Math.max(1.0, ph)));
+        double halfW = tileW * (0.27 - 0.11 * t) * userScale;
+        return Math.abs(px - anchor.x) <= halfW;
     }
 }
