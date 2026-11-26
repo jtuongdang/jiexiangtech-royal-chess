@@ -39,7 +39,7 @@ These captures come from the macOS Swing application in both **Classic 2D** and 
 
 The [latest GitHub release](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest) contains native applications with a bundled Java runtime and a portable JAR for Java 17+.
 
-- **macOS (Apple Silicon)** opens from the `.dmg` installer when available or the [macOS ZIP](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-macos-arm64.zip). Move `ChessMaster Royal.app` into Applications.
+- **macOS (Apple Silicon)** opens from the [DMG installer](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-macos-arm64.dmg) or the [macOS ZIP](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-macos-arm64.zip). Move `ChessMaster Royal.app` into Applications.
 - **Windows (x64)** uses the [Windows ZIP](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-windows-x64.zip). Extract the folder and start `ChessMasterRoyal.exe`.
 - **Linux (x86_64)** uses the [Linux archive](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-linux-x86_64.tar.gz). Extract it and start `ChessMasterRoyal/bin/ChessMasterRoyal`.
 

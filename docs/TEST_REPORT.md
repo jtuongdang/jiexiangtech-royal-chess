@@ -66,3 +66,9 @@ its bundled native launcher passed `--smoke` after mounting the image.
 The Apple Silicon ZIP's native launcher also passed. In a warmed, offscreen 2× Retina
 sample, the Expert engine returned a legal reply and the two Ultra renderers painted it.
 The 95th-percentile paint times were 5.2 ms for Classic and 11.8 ms for Focus on this Mac.
+
+[Release CI](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45839682535)
+passed Linux and Windows verification, MongoDB integration, Linux and Windows native launcher
+checks, and the Apple Silicon DMG and ZIP payload and architecture checks. The Mac launcher
+ran on the local Apple Silicon machine. The workflow published the packages and SHA-256
+checksums in [v1.1.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.1.0).
