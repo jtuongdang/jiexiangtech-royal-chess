@@ -49,7 +49,7 @@ final class RoyalPieceRenderer {
 
         int dw = Math.max(4, (int) Math.round(srcBounds.width * scale));
         int dh = Math.max(4, (int) Math.round(srcBounds.height * scale));
-        int baseY = tile.y + (int) Math.round(tile.height * 0.915) - (dragged ? Math.max(4, tile.height / 10) : 0);
+        int baseY = tile.y + (int) Math.round(tile.height * 0.945) - (dragged ? Math.max(4, tile.height / 10) : 0);
         int dx = tile.x + (tile.width - dw) / 2;
         int dy = baseY - dh;
 
@@ -59,13 +59,14 @@ final class RoyalPieceRenderer {
         }
 
         int shadowW = Math.max(8, (int) Math.round(dw * (dragged ? 1.08 : 0.98)));
-        int shadowH = Math.max(4, (int) Math.round(tile.height * (dragged ? 0.16 : 0.135)));
+        int shadowH = Math.max(4, (int) Math.round(tile.height * (dragged ? 0.15 : 0.115)));
         int shadowX = tile.x + (tile.width - shadowW) / 2;
-        int shadowY = tile.y + (int) Math.round(tile.height * 0.915) - shadowH / 2 + (dragged ? 3 : 0);
-        g.setColor(new Color(0, 0, 0, dragged ? 78 : 108));
-        g.fillOval(shadowX - 2, shadowY, shadowW + 4, shadowH + 2);
-        g.setColor(new Color(0, 0, 0, dragged ? 90 : 155));
-        g.fillOval(shadowX + shadowW / 10, shadowY + 1, shadowW * 4 / 5, Math.max(2, shadowH * 2 / 3));
+        int basePlaneY = baseY - Math.max(2, (int) Math.round(dw * 0.048));
+        int shadowY = basePlaneY - shadowH / 2 + (dragged ? 4 : 0);
+        g.setColor(new Color(0, 0, 0, dragged ? 78 : 122));
+        g.fillOval(shadowX - 1, shadowY, shadowW + 2, shadowH + 1);
+        g.setColor(new Color(0, 0, 0, dragged ? 90 : 175));
+        g.fillOval(shadowX + shadowW / 12, shadowY + 1, shadowW * 5 / 6, Math.max(2, shadowH * 2 / 3));
 
         if (source == null) {
             g.setColor(piece.side() == Side.WHITE ? RoyalStyle.IVORY : new Color(0x201913));
@@ -105,15 +106,6 @@ final class RoyalPieceRenderer {
 
         if (shadows != null) {
             shadows.paintPieceShadow(g, anchorX, anchorY, dw, localTileWidth, liftPixels, directionalShadow);
-        }
-
-        // Fast lightweight contrast halos (single alpha oval instead of RadialGradientPaint allocation)
-        if (piece.side() == Side.BLACK && onDarkSquare && liftPixels < 2.0) {
-            g.setColor(new Color(235, 196, 102, 40));
-            g.fillOval(dx - 4, dy + dh / 5, dw + 8, dh * 3 / 4);
-        } else if (piece.side() == Side.WHITE && liftPixels < 2.0) {
-            g.setColor(new Color(246, 204, 98, 26));
-            g.fillOval(dx - 2, (int) Math.round(anchorY - localTileWidth * 0.14), dw + 4, (int) Math.round(localTileWidth * 0.28));
         }
 
         if (source == null) {

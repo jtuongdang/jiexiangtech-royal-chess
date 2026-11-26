@@ -97,7 +97,13 @@ final class PerspectiveCoordinateMapper {
     int visualRow(int square) { return flipped ? Square.rank(square) : 7 - Square.rank(square); }
 
     double centerU(int square) { return (visualCol(square) + 0.5) / 8.0; }
-    double anchorV(int square) { return (visualRow(square) + 0.71) / 8.0; }
+    double anchorV(int square) {
+        int row = visualRow(square);
+        // Perspective-corrected footprint grounding: far-rank tiles are more foreshortened vertically
+        // while front-rank tiles sit deep toward the front edge so no rank appears floating above its tile.
+        double offset = 0.80 + 0.08 * (row / 7.0);
+        return (row + offset) / 8.0;
+    }
 
     Point2D.Double squareAnchor(int square) {
         return projection.project(centerU(square), anchorV(square));
