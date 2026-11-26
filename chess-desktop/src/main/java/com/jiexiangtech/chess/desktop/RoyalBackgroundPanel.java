@@ -11,6 +11,8 @@ final class RoyalBackgroundPanel extends JPanel {
     private final int radius;
     private final boolean heroScrim;
     private final Color glowColor;
+    private BufferedImage cachedLayer;
+    private int cachedW = -1, cachedH = -1;
 
     RoyalBackgroundPanel(LayoutManager layout, BufferedImage artwork, int radius, boolean heroScrim) {
         this(layout, artwork, radius, heroScrim, new Color(212, 175, 55, 22));
@@ -27,25 +29,36 @@ final class RoyalBackgroundPanel extends JPanel {
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        Graphics2D g = (Graphics2D) graphics.create();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         int w = getWidth(), h = getHeight();
-        if (w <= 0 || h <= 0) { g.dispose(); return; }
+        if (w <= 0 || h <= 0) return;
+        if (cachedLayer == null || cachedW != w || cachedH != h) {
+            cachedLayer = renderStaticLayer(w, h);
+            cachedW = w;
+            cachedH = h;
+        }
+        graphics.drawImage(cachedLayer, 0, 0, w, h, null);
+    }
+
+    private BufferedImage renderStaticLayer(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, radius > 0 ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
         Shape clip = radius > 0 ? new RoundRectangle2D.Double(0, 0, w, h, radius, radius) : new Rectangle(0, 0, w, h);
         g.setClip(clip);
 
-        // Deep obsidian base
         g.setPaint(new GradientPaint(0, 0, new Color(0x0E0D10), w, h, new Color(0x09090B)));
         g.fillRect(0, 0, w, h);
 
         if (artwork != null) {
-            BrandingManager.drawCover(g, artwork, w, h);
+            double scale = Math.max((double) w / artwork.getWidth(), (double) h / artwork.getHeight());
+            int dw = (int) Math.round(artwork.getWidth() * scale);
+            int dh = (int) Math.round(artwork.getHeight() * scale);
+            g.drawImage(artwork, (w - dw) / 2, (h - dh) / 2, dw, dh, null);
         }
 
         if (heroScrim) {
-            // Left-to-right cinematic readability scrim so foreground copy & buttons always pop
             g.setPaint(new LinearGradientPaint(0, 0, w, 0,
                     new float[]{0f, 0.48f, 0.78f, 1f},
                     new Color[]{new Color(10, 9, 11, 225), new Color(14, 12, 14, 170),
@@ -54,7 +67,6 @@ final class RoyalBackgroundPanel extends JPanel {
             g.setPaint(new GradientPaint(0, h * 0.65f, new Color(10, 9, 11, 0), 0, h, new Color(10, 9, 11, 145)));
             g.fillRect(0, 0, w, h);
         } else {
-            // Subtle warm ambient gold glow for atmospheric app canvas
             float r = Math.max(w, h) * 0.62f;
             g.setPaint(new RadialGradientPaint(w * 0.45f, h * 0.18f, Math.max(1f, r),
                     new float[]{0f, 1f}, new Color[]{glowColor, new Color(0, 0, 0, 0)}));
@@ -67,5 +79,6 @@ final class RoyalBackgroundPanel extends JPanel {
             g.drawRoundRect(0, 0, w - 1, h - 1, radius, radius);
         }
         g.dispose();
+        return img;
     }
 }

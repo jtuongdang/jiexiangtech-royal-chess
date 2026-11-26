@@ -12,7 +12,7 @@ import com.jiexiangtech.chess.domain.Side;
 final class RoyalPieceRenderer {
     private record CacheKey(Piece piece, int pw, int ph, boolean highQuality) {}
 
-    private static final int MAX_CACHE = 96;
+    private static final int MAX_CACHE = 128;
     private final AssetManager assets;
     private final Map<CacheKey, BufferedImage> cache = new LinkedHashMap<>(64, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<CacheKey, BufferedImage> eldest) {
@@ -53,23 +53,11 @@ final class RoyalPieceRenderer {
         int dx = tile.x + (tile.width - dw) / 2;
         int dy = baseY - dh;
 
-        // Contrast boost: warm golden rim halo behind black pieces on dark squares
         if (piece.side() == Side.BLACK && onDarkSquare && !dragged) {
-            float glowX = tile.x + tile.width / 2f;
-            float glowY = dy + dh * 0.54f;
-            float glowR = Math.max(8f, Math.max(dw, dh) * 0.64f);
-            RoyalGlowEffect.paintAmbientSpotlight(g, glowX, glowY, glowR, new Color(236, 198, 108, 76));
+            g.setColor(new Color(228, 192, 102, 42));
+            g.fillOval(dx - 3, dy + dh / 5, dw + 6, dh * 3 / 4);
         }
 
-        // Contrast boost: soft obsidian grounding contour behind white pieces on light marble squares
-        if (piece.side() == Side.WHITE && !onDarkSquare && !dragged) {
-            float sx = tile.x + tile.width / 2f;
-            float sy = dy + dh * 0.60f;
-            float sr = Math.max(8f, Math.max(dw, dh) * 0.56f);
-            RoyalGlowEffect.paintAmbientSpotlight(g, sx, sy, sr, new Color(18, 14, 10, 56));
-        }
-
-        // Realistic two-layer contact shadow anchored directly beneath piece base
         int shadowW = Math.max(8, (int) Math.round(dw * (dragged ? 1.08 : 0.98)));
         int shadowH = Math.max(4, (int) Math.round(tile.height * (dragged ? 0.16 : 0.135)));
         int shadowX = tile.x + (tile.width - shadowW) / 2;
@@ -85,21 +73,18 @@ final class RoyalPieceRenderer {
             return;
         }
 
-        // Compute Retina / HiDPI device pixel dimensions so cached sprites remain razor-sharp on macOS 2x displays
         AffineTransform tx = g.getTransform();
-        double dpiScale = Math.max(1.0, Math.min(3.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
+        double dpiScale = Math.max(1.0, Math.min(2.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
         int pw = Math.max(4, (int) Math.round(dw * dpiScale));
         int ph = Math.max(4, (int) Math.round(dh * dpiScale));
 
         BufferedImage cached = scaledSprite(piece, source, srcBounds, pw, ph, highQuality);
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, highQuality
-                ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(cached, dx, dy, dw, dh, null);
     }
 
     /**
-     * Renders an upright 2.5D billboard piece anchored at (anchorX, anchorY) on the perspective tabletop,
-     * scaled proportionally to the local foreshortened square width, with contact/cast shadows and rim contrast.
+     * Ultra-fast 60 FPS 2.5D billboard piece renderer using pre-cached Retina sprites and lightweight oval shadows
+     * (zero per-frame RadialGradientPaint allocations or source image rescaling).
      */
     Dimension drawPerspectivePiece(Graphics2D g, Piece piece, double anchorX, double anchorY, double localTileWidth,
                                    int pieceScalePercent, boolean highQuality, boolean onDarkSquare,
@@ -109,8 +94,6 @@ final class RoyalPieceRenderer {
         Rectangle srcBounds = assets.pieceBounds(piece);
 
         double userScale = pieceScalePercent / 97.0;
-        // 2.5D tabletop proportions calibrated to royal-focus-reference.png:
-        // Camera tilt (~32 deg) foreshortens vertical height slightly while bases remain full & commanding (+18% width fullness)
         double targetH = localTileWidth * 1.16 * heightRatio(piece.kind()) * userScale;
         double maxW = localTileWidth * 0.88 * userScale;
         double scale = Math.min(targetH / srcBounds.height, maxW / (srcBounds.width * 1.18));
@@ -124,21 +107,13 @@ final class RoyalPieceRenderer {
             shadows.paintPieceShadow(g, anchorX, anchorY, dw, localTileWidth, liftPixels, directionalShadow);
         }
 
-        // Warm golden floor reflection glow under front-rank ivory/gold pieces (matches reference warm marble bounce)
-        if (piece.side() == Side.WHITE && liftPixels < 2.0) {
-            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) anchorY,
-                    Math.max(8f, dw * 0.72f), new Color(246, 204, 98, 54));
-        }
-
-        // Subtle warm golden rim light behind black pieces on dark marble for effortless readability
+        // Fast lightweight contrast halos (single alpha oval instead of RadialGradientPaint allocation)
         if (piece.side() == Side.BLACK && onDarkSquare && liftPixels < 2.0) {
-            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.52),
-                    Math.max(10f, Math.max(dw, dh) * 0.62f), new Color(242, 202, 106, 84));
-        }
-        // Subtle grounding contrast halo behind white pieces on ivory marble
-        if (piece.side() == Side.WHITE && !onDarkSquare && liftPixels < 2.0) {
-            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.58),
-                    Math.max(10f, Math.max(dw, dh) * 0.54f), new Color(18, 14, 10, 56));
+            g.setColor(new Color(235, 196, 102, 40));
+            g.fillOval(dx - 4, dy + dh / 5, dw + 8, dh * 3 / 4);
+        } else if (piece.side() == Side.WHITE && liftPixels < 2.0) {
+            g.setColor(new Color(246, 204, 98, 26));
+            g.fillOval(dx - 2, (int) Math.round(anchorY - localTileWidth * 0.14), dw + 4, (int) Math.round(localTileWidth * 0.28));
         }
 
         if (source == null) {
@@ -148,13 +123,11 @@ final class RoyalPieceRenderer {
         }
 
         AffineTransform tx = g.getTransform();
-        double dpiScale = Math.max(1.0, Math.min(3.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
+        double dpiScale = Math.max(1.0, Math.min(2.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
         int pw = Math.max(4, (int) Math.round(dw * dpiScale));
         int ph = Math.max(4, (int) Math.round(dh * dpiScale));
 
         BufferedImage cached = scaledSprite(piece, source, srcBounds, pw, ph, highQuality);
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, highQuality
-                ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(cached, dx, dy, dw, dh, null);
         return new Dimension(dw, dh);
     }
@@ -172,14 +145,13 @@ final class RoyalPieceRenderer {
         return scaled;
     }
 
-    /** Multi-step halving downscale prevents aliasing artifacts on crisp gold metallic filigree. */
     private static BufferedImage downscaleProgressive(BufferedImage src, int targetW, int targetH) {
         BufferedImage current = src;
         int w = src.getWidth(), h = src.getHeight();
         while (w / 2 >= targetW && h / 2 >= targetH) {
             w = Math.max(targetW, w / 2);
             h = Math.max(targetH, h / 2);
-            current = scaleDirect(current, w, h, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            current = scaleDirect(current, w, h, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         }
         if (current.getWidth() != targetW || current.getHeight() != targetH) {
             current = scaleDirect(current, targetW, targetH, RenderingHints.VALUE_INTERPOLATION_BICUBIC);

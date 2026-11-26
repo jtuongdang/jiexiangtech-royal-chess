@@ -19,7 +19,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
 
     @Override
     public int squareAt(int width, int height, boolean flipped, double px, double py,
-                        Position position, int pieceScale, java.util.List<Move> candidates) {
+                        Position position, int pieceScale, java.util.List<Move> candidates, boolean[] movableSquares) {
         return BoardCoordinateMapper.fit(width, height, flipped).squareAt((int) Math.round(px), (int) Math.round(py));
     }
 

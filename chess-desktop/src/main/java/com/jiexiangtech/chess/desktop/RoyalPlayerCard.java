@@ -16,6 +16,8 @@ final class RoyalPlayerCard extends JPanel {
     private final JComponent activeDot;
     private boolean activeTurn;
     private boolean inCheck;
+    private String lastClockText;
+    private String lastRatingOverride;
 
     RoyalPlayerCard(AssetManager assets, Side side, String playerName, String badgeText, boolean isAi, String ratingText) {
         super(new BorderLayout(11, 0));
@@ -115,8 +117,16 @@ final class RoyalPlayerCard extends JPanel {
     }
 
     void update(String clockText, boolean timed, boolean active, boolean lowTime, boolean check, String ratingOverride) {
+        boolean nextInCheck = active && check;
+        if (this.activeTurn == active && this.inCheck == nextInCheck
+                && java.util.Objects.equals(this.lastClockText, clockText)
+                && java.util.Objects.equals(this.lastRatingOverride, ratingOverride)) {
+            return;
+        }
         this.activeTurn = active;
-        this.inCheck = active && check;
+        this.inCheck = nextInCheck;
+        this.lastClockText = clockText;
+        this.lastRatingOverride = ratingOverride;
         if (ratingOverride != null) ratingLabel.setText(ratingOverride);
         nameLabel.setForeground(active ? IVORY : new Color(0xC6C0B6));
         ratingLabel.setForeground(inCheck ? ERROR_TEXT : active ? new Color(0xE2CFA0) : new Color(0x9E9689));

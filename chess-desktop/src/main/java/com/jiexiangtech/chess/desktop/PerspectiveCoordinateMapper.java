@@ -145,17 +145,20 @@ final class PerspectiveCoordinateMapper {
      * 4. Falls back to exact inverse homography boardSquareAt(px, py).
      */
     int squareAt(double px, double py, Position position, int pieceScalePercent, java.util.List<Move> candidates) {
+        return squareAt(px, py, position, pieceScalePercent, candidates, null);
+    }
+
+    int squareAt(double px, double py, Position position, int pieceScalePercent,
+                 java.util.List<Move> candidates, boolean[] movableSquares) {
         int planeSq = boardSquareAt(px, py);
         if (position == null) return planeSq;
 
         if (candidates != null && !candidates.isEmpty()) {
-            // 1a. Board-plane hit on any legal target square always wins
             if (planeSq >= 0) {
                 for (Move m : candidates) {
                     if (m.to() == planeSq) return planeSq;
                 }
             }
-            // 1b. Clicking the upright body of an enemy piece on a legal capture square
             for (Move m : candidates) {
                 int to = m.to();
                 Piece targetPiece = position.piece(to);
@@ -165,29 +168,29 @@ final class PerspectiveCoordinateMapper {
             }
         }
 
-        // 2. If the board square directly under the cursor holds an own piece with legal moves, select it directly
         if (planeSq >= 0) {
             Piece onPlane = position.piece(planeSq);
-            if (onPlane != null && onPlane.side() == position.turn()
-                    && ! com.jiexiangtech.chess.domain.Rules.legalMoves(position, planeSq).isEmpty()) {
+            if (onPlane != null && onPlane.side() == position.turn() && isMovable(position, planeSq, movableSquares)) {
                 return planeSq;
             }
         }
 
-        // 3. Check protruding upright piece silhouettes (front-to-back) for movable own pieces first
         for (int row = 7; row >= 0; row--) {
             for (int col = 0; col < 8; col++) {
                 int sq = flipped ? Square.at(7 - col, row) : Square.at(col, 7 - row);
                 Piece piece = position.piece(sq);
                 if (piece == null || piece.side() != position.turn()) continue;
-                if (!com.jiexiangtech.chess.domain.Rules.legalMoves(position, sq).isEmpty()
-                        && hitsPieceSilhouette(px, py, sq, piece, pieceScalePercent)) {
+                if (isMovable(position, sq, movableSquares) && hitsPieceSilhouette(px, py, sq, piece, pieceScalePercent)) {
                     return sq;
                 }
             }
         }
 
         return planeSq;
+    }
+
+    private static boolean isMovable(Position position, int sq, boolean[] movableSquares) {
+        return movableSquares != null ? movableSquares[sq] : !Rules.legalMoves(position, sq).isEmpty();
     }
 
     private boolean hitsPieceSilhouette(double px, double py, int sq, Piece piece, int pieceScalePercent) {

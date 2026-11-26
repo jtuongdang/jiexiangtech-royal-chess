@@ -24,6 +24,7 @@ final class ChessBoardPanel extends JPanel {
     private final Consumer<Move> onMove;
     private BoardRenderer activeRenderer;
     private boolean focusMode;
+    private final boolean[] movableSquares = new boolean[64];
     private Position position;
     private Move last, hint;
     private int selected = -1, pressed = -1, hovered = -1;
@@ -126,10 +127,13 @@ final class ChessBoardPanel extends JPanel {
         last = move;
         hint = null;
         check = Rules.inCheck(next, next.turn());
+        java.util.Arrays.fill(movableSquares, false);
+        for (Move legal : Rules.legalMoves(next)) {
+            movableSquares[legal.from()] = true;
+        }
         clearSelection();
         if (animate && move != null) animator.triggerMove();
         else animator.clearMove();
-        animator.setAmbientPulse(check);
         repaint();
     }
 
@@ -161,7 +165,8 @@ final class ChessBoardPanel extends JPanel {
     @Override public void removeNotify() { animator.stop(); super.removeNotify(); }
 
     private int hitSquare(double px, double py) {
-        return activeRenderer.squareAt(getWidth(), getHeight(), flipped, px, py, position, preferences.pieceScale(), candidates);
+        return activeRenderer.squareAt(getWidth(), getHeight(), flipped, px, py, position,
+                preferences.pieceScale(), candidates, movableSquares);
     }
 
     private boolean isOwnPiece(int sq) {
@@ -178,7 +183,6 @@ final class ChessBoardPanel extends JPanel {
         if (!isOwnPiece(square)) return false;
         selected = square;
         candidates = Rules.legalMoves(position, square);
-        animator.setAmbientPulse(true);
         return true;
     }
 
@@ -199,7 +203,6 @@ final class ChessBoardPanel extends JPanel {
         selected = pressed = -1;
         origin = mouse = null;
         candidates = List.of();
-        animator.setAmbientPulse(check);
     }
 
     @Override protected void paintComponent(Graphics graphics) {
