@@ -23,17 +23,27 @@ and keep games, preferences and puzzle progress in a local SQLite database.
 
 ## Screenshots
 
-These captures come from the macOS Swing application. The gameplay capture shows a position reached by six legal moves.
+These captures come from the macOS Swing application in both **Classic 2D** and **Royal Focus 2.5D** modes.
 
 | Sign-in | Dashboard |
 | --- | --- |
 | ![ChessMaster sign-in](docs/screenshots/login.png) | ![ChessMaster dashboard](docs/screenshots/dashboard.png) |
 
-![Live match on the Royal Luxury board](docs/screenshots/gameplay.png)
+| Classic 2D Gameplay | Royal Focus 2.5D Gameplay |
+| --- | --- |
+| ![Live match on the Classic 2D Royal Luxury board](docs/screenshots/gameplay.png) | ![Live match on the Royal Focus 2.5D board](docs/screenshots/royal-focus-actual.png) |
 
-## Install and run
+## Download & install
 
-On Apple Silicon, open `ChessMaster Royal.app` from the macOS app image after extracting it. The image includes its Java runtime. On other systems use the portable JAR with JDK 17 or later, or build an application image on the target platform.
+Download pre-built desktop packages (with bundled Java 17 runtime) from the latest GitHub Release:
+
+- **Latest Release (`v1.0.0`)**: [ChessMaster – Royal Edition v1.0.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.0.0)
+  - **macOS (Apple Silicon)**: [royal-chess-macos-arm64.zip](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-macos-arm64.zip)
+  - **Windows (x64)**: [royal-chess-windows-x64.zip](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-windows-x64.zip)
+  - **Linux (x86_64)**: [royal-chess-linux-x86_64.tar.gz](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-linux-x86_64.tar.gz)
+  - **Portable JAR (All Platforms, JDK 17+)**: [royal-chess-1.0.0-all.jar](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-1.0.0-all.jar)
+
+On Apple Silicon, open `ChessMaster Royal.app` after extracting `royal-chess-macos-arm64.zip`. On Windows, extract `royal-chess-windows-x64.zip` and run `ChessMasterRoyal.exe`. On Linux, extract `royal-chess-linux-x86_64.tar.gz` and run `ChessMasterRoyal/bin/ChessMasterRoyal`.
 
 From a checkout at the repository root:
 
