@@ -1,14 +1,18 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
   verify:
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
   package:
@@ -19,7 +23,7 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-          - os: macos-15
+          - os: macos-26
             platform: macos
           - os: windows-latest
             platform: windows
@@ -42,6 +46,14 @@ jobs:
           CHESSMASTER_DATA_DIR="$(mktemp -d)" 'dist/app/ChessMaster Royal.app/Contents/MacOS/ChessMaster Royal' --smoke
           mkdir -p dist/upload
           ditto -c -k --keepParent 'dist/app/ChessMaster Royal.app' "dist/upload/royal-chess-macos-$(uname -m).zip"
+          scripts/package-macos.sh dist/installer dmg
+          mv dist/installer/*.dmg "dist/upload/royal-chess-macos-$(uname -m).dmg"
+          hdiutil verify "dist/upload/royal-chess-macos-$(uname -m).dmg"
+          mount_dir=$(mktemp -d)
+          printf 'Y\n' | hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" \
+            "dist/upload/royal-chess-macos-$(uname -m).dmg"
+          trap 'hdiutil detach "$mount_dir"' EXIT
+          CHESSMASTER_DATA_DIR="$(mktemp -d)" "$mount_dir/ChessMaster Royal.app/Contents/MacOS/ChessMaster Royal" --smoke
       - name: Package for Linux
         if: runner.os == 'Linux'
         run: |
@@ -76,16 +88,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
-      - name: Check the tag version
-        run: |
-          python3 - <<'PY'
-          import os
-          from xml.etree import ElementTree
-          pom = ElementTree.parse('pom.xml')
-          version = pom.getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
-          if os.environ['GITHUB_REF_NAME'] != 'v' + version:
-              raise SystemExit('The release tag must match the Maven project version.')
-          PY
       - uses: actions/download-artifact@v4
         with:
           pattern: application-*
@@ -95,10 +97,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mapfile -d '' packages < <(find verified -type f \( -name '*-all.jar' -o -name '*.zip' -o -name '*.tar.gz' \) -print0)
-          if [ "${#packages[@]}" -ne 4 ]; then
-            echo "Expected one JAR and three native app images." >&2
+          version=$(python3 - <<'PY'
+          from xml.etree import ElementTree
+          root = ElementTree.parse('pom.xml').getroot()
+          print(root.find('{http://maven.apache.org/POM/4.0.0}version').text)
+          PY
+          )
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          if [[ -n "$(git ls-remote origin "refs/tags/$tag")" ]]; then
+            echo "Release tag $tag already exists." >&2
             exit 1
           fi
+          packages=(
+            "verified/royal-chess-$version-all.jar"
+            verified/royal-chess-macos-arm64.dmg
+            verified/royal-chess-macos-arm64.zip
+            verified/royal-chess-windows-x64.zip
+            verified/royal-chess-linux-x86_64.tar.gz
+          )
           sha256sum "${packages[@]}" | sed 's#  .*/#  #' > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${packages[@]}" SHA256SUMS.txt LICENSE THIRD_PARTY.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "ChessMaster – Royal Edition $tag" \
+            --generate-notes "${packages[@]}" SHA256SUMS.txt LICENSE THIRD_PARTY.md

@@ -61,3 +61,11 @@ reference remains the camera and geometry baseline. The projective grid, live 2D
 toggle and SQLite preferences use the existing geometry and state.
 
 [Current live capture](../screenshots/royal-focus-actual.png) · [Focus comparison](../screenshots/royal-focus-comparison.png)
+
+## Piece motion
+
+Each move eases in and out as the piece travels between projected square anchors. Moving
+pieces are drawn in board depth order and reuse a Retina sprite while changing perspective
+size. Dragged pieces settle from the cursor release point. Captures fade near arrival,
+castling animates both pieces, and promotion changes the sprite on landing. Ultra requests
+an 8 ms repaint interval during movement. Swing coalesces requests when the system is busy.

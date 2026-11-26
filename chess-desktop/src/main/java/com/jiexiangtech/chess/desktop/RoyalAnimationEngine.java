@@ -4,13 +4,15 @@ import java.awt.Component;
 import javax.swing.Timer;
 
 final class RoyalAnimationEngine {
-    private static final double MOVE_DURATION_NS = 190_000_000.0;
+    private static final int STANDARD_FRAME_MS = 16;
     private static final double CELEBRATION_DURATION_NS = 1_250_000_000.0;
     private static final double OVERLAY_DURATION_NS = 320_000_000.0;
 
     private final Timer timer;
     private boolean enabled = true;
     private long moveStartedAt;
+    private long moveDuration;
+    private int moveFrameDelay = STANDARD_FRAME_MS;
     private long celebrationStartedAt;
     private long overlayStartedAt;
     private boolean celebrating;
@@ -18,30 +20,39 @@ final class RoyalAnimationEngine {
     private boolean ambientPulseActive;
 
     RoyalAnimationEngine(Component target) {
-        timer = new Timer(16, event -> {
+        timer = new Timer(STANDARD_FRAME_MS, event -> {
             if (celebrating && celebrationProgress() >= 1.0) celebrating = false;
             boolean moveDone = moveProgress() >= 1.0;
+            var source = (Timer) event.getSource();
+            if (moveDone) source.setDelay(STANDARD_FRAME_MS);
             boolean overlayDone = !overlayVisible || overlayProgress() >= 1.0;
             if (moveDone && !celebrating && overlayDone && !ambientPulseActive) {
-                ((Timer) event.getSource()).stop();
+                source.stop();
             }
             target.repaint();
         });
+        timer.setInitialDelay(0);
         timer.setCoalesce(true);
     }
+
+    void setFastMotion(boolean fast) { moveFrameDelay = fast ? 8 : STANDARD_FRAME_MS; }
 
     void setEnabled(boolean enabled) {
         this.enabled = enabled;
         if (!enabled) {
+            clearMove();
             celebrating = false;
             ambientPulseActive = false;
             timer.stop();
         }
     }
 
-    void triggerMove() {
-        moveStartedAt = enabled ? System.nanoTime() : 0;
-        if (moveStartedAt != 0) timer.start();
+    void triggerMove(int millis) {
+        if (!enabled) return;
+        moveDuration = millis * 1_000_000L;
+        moveStartedAt = System.nanoTime();
+        timer.setDelay(moveFrameDelay);
+        timer.start();
     }
 
     void clearMove() {
@@ -73,12 +84,7 @@ final class RoyalAnimationEngine {
 
     double moveProgress() {
         if (moveStartedAt == 0 || !enabled) return 1.0;
-        return Math.min(1.0, (System.nanoTime() - moveStartedAt) / MOVE_DURATION_NS);
-    }
-
-    double easedMoveProgress() {
-        double t = moveProgress();
-        return 1.0 - Math.pow(1.0 - t, 3);
+        return Math.min(1.0, (System.nanoTime() - moveStartedAt) / (double) moveDuration);
     }
 
     boolean isCelebrating() { return celebrating; }
@@ -101,6 +107,7 @@ final class RoyalAnimationEngine {
     }
 
     void stop() {
+        clearMove();
         ambientPulseActive = false;
         celebrating = false;
         timer.stop();

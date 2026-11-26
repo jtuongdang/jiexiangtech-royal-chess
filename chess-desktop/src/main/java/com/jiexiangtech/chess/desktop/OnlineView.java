@@ -79,7 +79,7 @@ final class OnlineView extends JPanel {
         });
         control.setSelectedItem(Control.RAPID_10_5);
         String defaultServer = System.getProperty("royal.serverUrl", System.getenv("CHESS_SERVER_URL"));
-        server.setText(defaultServer == null ? "http://localhost:8080" : defaultServer);
+        server.setText(defaultServer == null ? BrandConstants.ONLINE_SERVER : defaultServer);
         name.setText(frame.displayLabel());
         addField(fields, "onlineServer", server);
         addField(fields, "displayName", name);
@@ -297,10 +297,12 @@ final class OnlineView extends JPanel {
                 pending = null;
                 notice.setText(" ");
                 accept(state);
+                board.clearPendingDrop();
             } else {
                 var problem = asProblem(failure);
                 if (problem != null && problem.status >= 400 && problem.status < 500) {
                     pending = null;
+                    board.clearPendingDrop();
                     showError(failure);
                     refresh();
                 } else {

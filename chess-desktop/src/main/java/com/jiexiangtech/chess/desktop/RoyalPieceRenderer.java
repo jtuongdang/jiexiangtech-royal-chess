@@ -98,45 +98,45 @@ final class RoyalPieceRenderer {
         return new Rectangle(tile.x + (tile.width - width) / 2, baseY - height, width, height);
     }
 
-    /**
-     * Ultra-fast 60 FPS 2.5D billboard piece renderer using pre-cached Retina sprites and lightweight oval shadows
-     * (zero per-frame RadialGradientPaint allocations or source image rescaling).
-     */
-    Dimension drawPerspectivePiece(Graphics2D g, Piece piece, double anchorX, double anchorY, double localTileWidth,
-                                   int pieceScalePercent, boolean highQuality, boolean onDarkSquare,
-                                   double liftPixels, ShadowRenderer shadows, boolean directionalShadow) {
-        if (piece == null) return new Dimension(0, 0);
+    void drawPerspectivePiece(Graphics2D g, Piece piece, double anchorX, double anchorY, double tileWidth,
+                              double spriteTileWidth, int pieceScalePercent, boolean highQuality, double liftPixels,
+                              ShadowRenderer shadows, boolean directionalShadow) {
+        if (piece == null) return;
         BufferedImage source = assets.piece(piece);
         Rectangle srcBounds = assets.pieceBounds(piece);
 
         double userScale = pieceScalePercent / 97.0;
-        double targetH = localTileWidth * 1.16 * heightRatio(piece.kind()) * userScale;
-        double maxW = localTileWidth * 0.88 * userScale;
-        double scale = Math.min(targetH / srcBounds.height, maxW / (srcBounds.width * 1.18));
-
-        int dw = Math.max(4, (int) Math.round(srcBounds.width * scale * 1.18));
-        int dh = Math.max(4, (int) Math.round(srcBounds.height * scale));
-        int dx = (int) Math.round(anchorX - dw / 2.0);
-        int dy = (int) Math.round(anchorY - dh - liftPixels);
+        double scalePerTile = Math.min(1.16 * heightRatio(piece.kind()) / srcBounds.height,
+                0.88 / (srcBounds.width * 1.18)) * userScale;
+        double widthPerTile = srcBounds.width * 1.18 * scalePerTile;
+        double heightPerTile = srcBounds.height * scalePerTile;
+        double dw = Math.max(4, widthPerTile * tileWidth);
+        double dh = Math.max(4, heightPerTile * tileWidth);
+        double dx = anchorX - dw / 2;
+        double dy = anchorY - dh - liftPixels;
 
         if (shadows != null) {
-            shadows.paintPieceShadow(g, anchorX, anchorY, dw, localTileWidth, liftPixels, directionalShadow);
+            shadows.paintPieceShadow(g, anchorX, anchorY, dw, tileWidth, liftPixels, directionalShadow);
         }
 
         if (source == null) {
             g.setColor(piece.side() == Side.WHITE ? RoyalStyle.IVORY : new Color(0x201913));
-            g.fillOval(dx, dy, dw, dh);
-            return new Dimension(dw, dh);
+            g.fill(new java.awt.geom.Ellipse2D.Double(dx, dy, dw, dh));
+            return;
         }
 
         AffineTransform tx = g.getTransform();
         double dpiScale = Math.max(1.0, Math.min(2.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
-        int pw = Math.max(4, (int) Math.round(dw * dpiScale));
-        int ph = Math.max(4, (int) Math.round(dh * dpiScale));
+        int pw = Math.max(4, (int) Math.round(widthPerTile * spriteTileWidth * dpiScale));
+        int ph = Math.max(4, (int) Math.round(heightPerTile * spriteTileWidth * dpiScale));
 
         BufferedImage cached = scaledSprite(piece, source, srcBounds, pw, ph, highQuality);
-        g.drawImage(cached, dx, dy, dw, dh, null);
-        return new Dimension(dw, dh);
+        var placement = AffineTransform.getTranslateInstance(dx, dy);
+        placement.scale(dw / pw, dh / ph);
+        Object interpolation = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(cached, placement, null);
+        if (interpolation != null) g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, interpolation);
     }
 
     private BufferedImage scaledSprite(Piece piece, BufferedImage source, Rectangle srcBounds,

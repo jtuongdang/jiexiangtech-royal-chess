@@ -10,11 +10,11 @@ import com.jiexiangtech.chess.application.Preferences;
 import com.jiexiangtech.chess.domain.*;
 
 /**
- * High-performance 60 FPS Royal Focus Mode 2.5D renderer:
+ * Royal Focus Mode 2.5D renderer:
  * - Bakes the entire static 2.5D board stage (spotlight, drop shadow, 3D front slab, ornate gold frame,
  *   warped 64 marble tiles, coordinates, and corner vignette) into a single offscreen Retina BufferedImage
  *   rebuilt only on resize/flip/theme/quality change.
- * - Dynamic frame rendering is < 2ms (1 image blit + highlight polygons + 32 pre-cached Retina sprites).
+ * - Dynamic rendering reuses the board surface and Retina sprites while projecting each piece in depth order.
  */
 final class RoyalFocusBoardRenderer implements BoardRenderer {
     private record StageKey(int width, int height, boolean flipped, String theme,
@@ -61,52 +61,37 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
             cachedStageKey = key;
         }
 
-        // 1. Instant blit of the entire cached 2.5D tabletop stage (< 0.3ms!)
+        // Reuse the complete static tabletop stage during movement.
         g.drawImage(cachedStaticStage, 0, 0, w, h, null);
 
         // 2. Dynamic perspective square highlights (last move, hover, selected bloom, check, legal targets, hint)
         paintPerspectiveHighlights(g, mapper, s);
 
         boolean directionalShadows = quality != Preferences.GraphicsQuality.LOW;
-        double moveT = s.moveProgress();
-
-        // 3. Fading captured piece (during capture animation only)
-        if (moveT < 1.0 && s.disappearing() != null && s.capturedSquare() >= 0) {
-            g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0.0, 1.0 - moveT)));
-            Point2D.Double capAnchor = mapper.squareAnchor(s.capturedSquare());
-            pieceRenderer.drawPerspectivePiece(g, s.disappearing(), capAnchor.x, capAnchor.y,
-                    mapper.squareWidth(s.capturedSquare()), s.preferences().pieceScale(), s.preferences().highQuality(),
-                    isDark(s.capturedSquare()), 0.0, shadowRenderer, directionalShadows);
+        MoveAnimation motion = s.motion();
+        if (motion != null && motion.captured() != null) {
+            int square = motion.capturedSquare();
+            Point2D.Double anchor = mapper.squareAnchor(square);
+            g.setComposite(AlphaComposite.SrcOver.derive(MoveAnimation.captureAlpha(s.moveProgress())));
+            drawPose(g, s, new Pose(motion.captured(), anchor.x, anchor.y, mapper.squareWidth(square),
+                    mapper.squareWidth(square), 0), directionalShadows);
             g.setComposite(AlphaComposite.SrcOver);
         }
 
-        // 4. Depth-sorted upright 2.5D billboard pieces (back rank -> front rank)
+        java.util.List<Pose> travel = motion == null ? java.util.List.of() : movingPieces(mapper, s, motion);
+        int movingIndex = 0;
         for (var entry : PieceDepthSorter.backToFront(s.position(), s.flipped())) {
-            int sq = entry.square();
-            if ((sq == s.selected() && s.dragPoint() != null)
-                    || (moveT < 1.0 && s.last() != null && sq == s.last().to())) continue;
-            Point2D.Double anchor = mapper.squareAnchor(sq);
-            double tileW = mapper.squareWidth(sq);
-            double selectLift = (sq == s.selected()) ? tileW * 0.055 : 0.0;
-            pieceRenderer.drawPerspectivePiece(g, entry.piece(), anchor.x, anchor.y, tileW,
-                    s.preferences().pieceScale(), s.preferences().highQuality(), isDark(sq),
-                    selectLift, shadowRenderer, directionalShadows);
+            int square = entry.square();
+            if (s.hidesPiece(square)) continue;
+            Point2D.Double anchor = mapper.squareAnchor(square);
+            while (movingIndex < travel.size() && travel.get(movingIndex).y() < anchor.y) {
+                drawPose(g, s, travel.get(movingIndex++), directionalShadows);
+            }
+            double tile = mapper.squareWidth(square);
+            drawPose(g, s, new Pose(entry.piece(), anchor.x, anchor.y, tile, tile,
+                    square == s.selected() ? tile * 0.055 : 0), directionalShadows);
         }
-
-        // 5. Perspective-interpolated moving piece animation
-        if (moveT < 1.0 && s.last() != null) {
-            double eased = s.easedMoveProgress();
-            double u0 = mapper.centerU(s.last().from()), v0 = mapper.anchorV(s.last().from());
-            double u1 = mapper.centerU(s.last().to()), v1 = mapper.anchorV(s.last().to());
-            double u = u0 + (u1 - u0) * eased;
-            double v = v0 + (v1 - v0) * eased;
-            Point2D.Double pos = proj.project(u, v);
-            double tileW = mapper.squareWidthAt(v);
-            double lift = Math.sin(Math.PI * moveT) * tileW * 0.32;
-            pieceRenderer.drawPerspectivePiece(g, s.position().piece(s.last().to()), pos.x, pos.y, tileW,
-                    s.preferences().pieceScale(), s.preferences().highQuality(), isDark(s.last().to()),
-                    lift, shadowRenderer, directionalShadows);
-        }
+        while (movingIndex < travel.size()) drawPose(g, s, travel.get(movingIndex++), directionalShadows);
 
         // 6. Hint directional arrow
         if (s.hint() != null) {
@@ -115,15 +100,8 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
             Classic2DBoardRenderer.drawArrow(g, a.x, a.y, b.x, b.y, mapper.squareWidth(s.hint().to()));
         }
 
-        // 7. Elevated dragged piece
-        if (s.dragPoint() != null && s.selected() >= 0) {
-            Point2D.Double uv = proj.unproject(s.dragPoint().x, s.dragPoint().y);
-            double clampedV = Math.max(0.0, Math.min(1.0, uv.y));
-            double tileW = mapper.squareWidthAt(clampedV);
-            pieceRenderer.drawPerspectivePiece(g, s.position().piece(s.selected()),
-                    s.dragPoint().x, s.dragPoint().y + tileW * 0.20, tileW * 1.04,
-                    s.preferences().pieceScale(), s.preferences().highQuality(), true,
-                    tileW * 0.24, shadowRenderer, directionalShadows);
+        if (s.heldPoint() != null && s.heldSquare() >= 0) {
+            drawPose(g, s, heldPose(mapper, s.position().piece(s.heldSquare()), s.heldPoint()), directionalShadows);
         }
 
         // 8. Checkmate golden sparks & outcome overlay
@@ -136,6 +114,49 @@ final class RoyalFocusBoardRenderer implements BoardRenderer {
             Classic2DBoardRenderer.paintOutcomeOverlay(g, box.x, box.y, box.width, box.height,
                     s.overlayTitle(), s.overlaySubtitle(), s.overlayAccent(), s.overlayAlpha());
         }
+    }
+
+    private record Pose(Piece piece, double x, double y, double tile, double spriteTile, double lift) {}
+
+    private void drawPose(Graphics2D g, RenderState s, Pose pose, boolean directionalShadows) {
+        pieceRenderer.drawPerspectivePiece(g, pose.piece(), pose.x(), pose.y(), pose.tile(), pose.spriteTile(),
+                s.preferences().pieceScale(), s.preferences().highQuality(), pose.lift(),
+                shadowRenderer, directionalShadows);
+    }
+
+    private static java.util.List<Pose> movingPieces(PerspectiveCoordinateMapper mapper, RenderState state,
+                                                      MoveAnimation motion) {
+        double progress = MoveAnimation.ease(state.moveProgress());
+        Pose main = travelPose(mapper, motion.piece(), motion.move(), motion.release(), progress);
+        if (motion.rook() == null) return java.util.List.of(main);
+        Pose rook = travelPose(mapper, state.position().piece(motion.rook().to()), motion.rook(), null, progress);
+        return rook.y() <= main.y() ? java.util.List.of(rook, main) : java.util.List.of(main, rook);
+    }
+
+    private static Pose travelPose(PerspectiveCoordinateMapper mapper, Piece piece, Move move,
+                                   Point release, double progress) {
+        double targetTile = mapper.squareWidth(move.to());
+        if (release != null) {
+            Pose start = heldPose(mapper, piece, release);
+            Point2D.Double target = mapper.squareAnchor(move.to());
+            return new Pose(piece, MoveAnimation.lerp(start.x(), target.x, progress),
+                    MoveAnimation.lerp(start.y(), target.y, progress),
+                    MoveAnimation.lerp(start.tile(), targetTile, progress), Math.max(start.tile(), targetTile),
+                    start.lift() * (1 - progress));
+        }
+
+        double u = MoveAnimation.lerp(mapper.centerU(move.from()), mapper.centerU(move.to()), progress);
+        double v = MoveAnimation.lerp(mapper.anchorV(move.from()), mapper.anchorV(move.to()), progress);
+        Point2D.Double anchor = mapper.projection().project(u, v);
+        double tile = mapper.squareWidthAt(v);
+        double lift = tile * (piece.kind() == Kind.KNIGHT ? 0.18 : 0.07) * 4 * progress * (1 - progress);
+        return new Pose(piece, anchor.x, anchor.y, tile, Math.max(mapper.squareWidth(move.from()), targetTile), lift);
+    }
+
+    private static Pose heldPose(PerspectiveCoordinateMapper mapper, Piece piece, Point point) {
+        double v = mapper.projection().unproject(point.x, point.y).y;
+        double tile = mapper.squareWidthAt(Math.max(0, Math.min(1, v)));
+        return new Pose(piece, point.x, point.y + tile * 0.20, tile * 1.04, tile * 1.04, tile * 0.24);
     }
 
     private BufferedImage buildStaticStage(int w, int h, PerspectiveCoordinateMapper mapper,

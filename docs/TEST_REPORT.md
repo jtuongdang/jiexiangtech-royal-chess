@@ -9,9 +9,9 @@ Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and
 | Domain | 14 | Initial and special-position perft, castling, pinned en passant, promotion, FEN/SAN/PGN, checkmate, stalemate, claims, automatic draws, sealed pawns and clocks |
 | Application | 3 | Restore repetition and clocks, validate and clear password buffers, verify each puzzle solution |
 | Infrastructure | 6 | Migrate and reopen SQLite, authenticate, force and recover a transaction rollback, restore and undo a game, award once, unlock theme and validate legal AI output |
-| Desktop | 6 | Sprite and bezel alpha, marble variants, Classic piece and bezel ratios, 2D and 2.5D coordinate round-trips, 2.5D click-to-move, offscreen rendering, icons and locale bundles |
+| Desktop | 8 | Sprite and bezel alpha, marble variants, board geometry and hit testing, intermediate and final animation frames, drag release, capture, castling, promotion, icons and locale bundles |
 | Server | 6 | Invitation authorization, seat isolation, clocks, replay and dedupe, plus HTTP/WebSocket with real MongoDB across restart |
-| **Total** | **35** | **0 failures, 0 errors, 0 skipped** |
+| **Total** | **37** | **0 failures, 0 errors, 0 skipped** |
 
 ## Perft
 
@@ -59,3 +59,7 @@ resynchronization after disconnect and a persisted resignation result.
 [GitHub Actions for the deployed revision](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45824365829)
 passed on Linux and Windows, and the live MongoDB integration job passed. The hosted macOS
 job was cancelled. The local macOS Maven reactor and desktop smoke test passed.
+
+For desktop v1.1.0, the macOS Swing launcher refreshed the live Focus capture and reference
+comparison. The Apple Silicon DMG was generated, its integrity verified with `hdiutil`, and
+its bundled native launcher passed `--smoke` after mounting the image.

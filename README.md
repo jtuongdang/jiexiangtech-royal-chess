@@ -37,21 +37,17 @@ These captures come from the macOS Swing application in both **Classic 2D** and 
 
 ## Download & install
 
-Download pre-built desktop packages (with bundled Java 17 runtime) from the latest GitHub Release:
+The [latest GitHub release](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest) contains native applications with a bundled Java runtime and a portable JAR for Java 17+.
 
-- **Latest Release (`v1.0.0`)**: [ChessMaster – Royal Edition v1.0.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.0.0)
-  - **macOS (Apple Silicon)**: [royal-chess-macos-arm64.zip](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-macos-arm64.zip)
-  - **Windows (x64)**: [royal-chess-windows-x64.zip](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-windows-x64.zip)
-  - **Linux (x86_64)**: [royal-chess-linux-x86_64.tar.gz](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-linux-x86_64.tar.gz)
-  - **Portable JAR (All Platforms, JDK 17+)**: [royal-chess-1.0.0-all.jar](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/download/v1.0.0/royal-chess-1.0.0-all.jar)
-
-On Apple Silicon, open `ChessMaster Royal.app` after extracting `royal-chess-macos-arm64.zip`. On Windows, extract `royal-chess-windows-x64.zip` and run `ChessMasterRoyal.exe`. On Linux, extract `royal-chess-linux-x86_64.tar.gz` and run `ChessMasterRoyal/bin/ChessMasterRoyal`.
+- **macOS (Apple Silicon)** opens from the `.dmg` installer when available or the [macOS ZIP](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-macos-arm64.zip). Move `ChessMaster Royal.app` into Applications.
+- **Windows (x64)** uses the [Windows ZIP](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-windows-x64.zip). Extract the folder and start `ChessMasterRoyal.exe`.
+- **Linux (x86_64)** uses the [Linux archive](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest/download/royal-chess-linux-x86_64.tar.gz). Extract it and start `ChessMasterRoyal/bin/ChessMasterRoyal`.
 
 From a checkout at the repository root:
 
 ```sh
 mvn clean verify
-java -jar chess-desktop/target/royal-chess-1.0.0-all.jar
+java -jar chess-desktop/target/royal-chess-1.1.0-all.jar
 ```
 
 On macOS, [build.sh](scripts/build.sh) and [run.sh](scripts/run.sh) select the installed Java 17 JDK when `JAVA_HOME` is unset. On Windows, run `scripts\run.bat` after Maven succeeds. Build native images with the bundled runtime on the host operating system:
@@ -92,7 +88,7 @@ flowchart LR
 ├── chess-server          Online rooms, clocks, WebSocket and MongoDB
 ├── scripts               Build, launch, package and asset preparation
 ├── docs                  Requirements, architecture, schema and verification
-└── .github/workflows     CI and tag-based releases
+└── .github/workflows     CI and verified desktop releases
 ```
 
 [Architecture](docs/ARCHITECTURE.md) · [Database design](docs/DATABASE.md) · [Game rules](docs/GAME_RULES.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Asset manifest](docs/ASSET_MANIFEST.md)
@@ -109,7 +105,7 @@ Expert and replay analysis can use a separately installed Stockfish executable o
 
 ```sh
 CHESSMASTER_DATA_DIR="$(mktemp -d)" java -Djava.awt.headless=true \
-  -jar chess-desktop/target/royal-chess-1.0.0-all.jar --smoke
+  -jar chess-desktop/target/royal-chess-1.1.0-all.jar --smoke
 ```
 
 See [Test report](docs/TEST_REPORT.md) for observed results and [Implementation status](docs/IMPLEMENTATION_STATUS.md) for remaining work. The main rules gap concerns uncommon dead positions beyond the verified material and sealed-pawn cases.

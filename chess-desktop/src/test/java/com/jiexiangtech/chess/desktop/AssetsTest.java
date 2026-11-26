@@ -137,6 +137,69 @@ class AssetsTest {
         });
     }
 
+    @Test void moveAnimationKeepsTheOriginalPiecesAndSettlesAtBothEndpoints() {
+        var initial = Position.initial();
+        var shortMove = MoveAnimation.from(initial, Move.uci("e2e3"), null);
+        var longMove = MoveAnimation.from(initial, Move.uci("e2e4"), null);
+        var release = new java.awt.Point(123, 456);
+        var dropped = MoveAnimation.from(initial, Move.uci("e2e4"), release);
+        assertEquals(release, dropped.release());
+        assertTrue(dropped.durationMillis() < shortMove.durationMillis());
+        assertTrue(shortMove.durationMillis() < longMove.durationMillis());
+        assertEquals(0, MoveAnimation.ease(0));
+        assertEquals(0.5, MoveAnimation.ease(0.5));
+        assertEquals(1, MoveAnimation.ease(1));
+        assertTrue(MoveAnimation.ease(0.01) < 0.001);
+        assertTrue(1 - MoveAnimation.ease(0.99) < 0.001);
+
+        var castle = MoveAnimation.from(Position.fromFen("4k3/8/8/8/8/8/8/4K2R w K - 0 1"),
+                Move.uci("e1g1"), null);
+        assertEquals(Move.uci("h1f1"), castle.rook());
+        var enPassant = MoveAnimation.from(Position.fromFen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2"),
+                Move.uci("e5d6"), null);
+        assertEquals(Square.parse("d5"), enPassant.capturedSquare());
+        assertEquals(Piece.of(Side.BLACK, Kind.PAWN), enPassant.captured());
+        assertEquals(1f, MoveAnimation.captureAlpha(0.38));
+        assertEquals(0f, MoveAnimation.captureAlpha(1));
+        var promotion = MoveAnimation.from(Position.fromFen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1"),
+                Move.uci("a7a8q"), null);
+        assertEquals(Piece.of(Side.WHITE, Kind.PAWN), promotion.piece());
+    }
+
+    @Test void bothRenderersPaintAnIntermediateMoveAndTheCorrectFinalPosition() throws Exception {
+        var assets = new AssetManager();
+        var preferences = Preferences.defaults("en");
+        var before = Position.initial();
+        var move = Move.uci("e2e4");
+        var after = before.afterGeneratedMove(move);
+        var pieces = new RoyalPieceRenderer(assets);
+        SwingUtilities.invokeAndWait(() -> {
+            for (BoardRenderer renderer : java.util.List.of(new Classic2DBoardRenderer(assets, pieces),
+                    new RoyalFocusBoardRenderer(assets, pieces))) {
+                var motion = MoveAnimation.from(before, move, null);
+                int[] start = paintMove(renderer, after, move, preferences, motion, 0);
+                int[] middle = paintMove(renderer, after, move, preferences, motion, 0.5);
+                int[] beforeLanding = paintMove(renderer, after, move, preferences, motion, 0.8);
+                int[] landed = paintMove(renderer, after, move, preferences, null, 1);
+                assertFalse(java.util.Arrays.equals(start, middle));
+                assertFalse(java.util.Arrays.equals(middle, beforeLanding));
+                assertFalse(java.util.Arrays.equals(beforeLanding, landed));
+                assertArrayEquals(landed, paintMove(renderer, after, move, preferences, null, 1));
+            }
+        });
+    }
+
+    private static int[] paintMove(BoardRenderer renderer, Position position, Move move, Preferences preferences,
+                                   MoveAnimation motion, double progress) {
+        var image = new BufferedImage(650, 580, BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        renderer.paint(g, new BoardRenderer.RenderState(650, 580, position, false, "royal", preferences,
+                move, null, -1, -1, java.util.List.of(), false, false, null, null, null,
+                motion, progress, 0.5f, false, 1, null, null, RoyalStyle.PALE, 0));
+        g.dispose();
+        return image.getRGB(0, 0, 650, 580, null, 0, 650);
+    }
+
     private static void clickAt(ChessBoardPanel board, int x, int y) {
         long now = System.currentTimeMillis();
         board.dispatchEvent(new java.awt.event.MouseEvent(board, java.awt.event.MouseEvent.MOUSE_PRESSED,

@@ -31,8 +31,9 @@ final class ChessBoardPanel extends JPanel {
     private Point origin, mouse;
     private List<Move> candidates = List.of();
     private boolean flipped, check;
-    private Piece disappearing;
-    private int capturedSquare = -1;
+    private MoveAnimation motion;
+    private Move droppedMove;
+    private Point droppedAt;
     private String overlayTitle, overlaySubtitle;
     private Color overlayAccent = RoyalStyle.PALE;
 
@@ -42,8 +43,7 @@ final class ChessBoardPanel extends JPanel {
         this.classic2D = new Classic2DBoardRenderer(assets, pieceRenderer);
         this.royalFocus25D = new RoyalFocusBoardRenderer(assets, pieceRenderer);
         this.animator = new RoyalAnimationEngine(this);
-        this.preferences = preferences;
-        this.animator.setEnabled(preferences.animation());
+        setPreferences(preferences);
         this.theme = theme;
         this.playable = playable;
         this.promotion = promotion;
@@ -96,7 +96,7 @@ final class ChessBoardPanel extends JPanel {
                 if (!playable.getAsBoolean()) { repaint(); return; }
                 int target = hitSquare(event.getX(), event.getY());
                 if (!dragging && target == from && selected == target) clearSelection();
-                else if (target >= 0 && tryMove(target)) clearSelection();
+                else if (target >= 0 && tryMove(target, dragging ? event.getPoint() : null)) clearSelection();
                 else if (!dragging && target >= 0 && !select(target)) clearSelection();
                 repaint();
             }
@@ -106,6 +106,7 @@ final class ChessBoardPanel extends JPanel {
     }
 
     void setFocusMode(boolean enabled) {
+        if (focusMode != enabled) clearPendingDrop();
         this.focusMode = enabled;
         this.activeRenderer = enabled ? royalFocus25D : classic2D;
         repaint();
@@ -116,13 +117,15 @@ final class ChessBoardPanel extends JPanel {
     void setPreferences(Preferences next) {
         this.preferences = next;
         this.animator.setEnabled(next.animation());
+        this.animator.setFastMotion(next.graphicsQuality() == Preferences.GraphicsQuality.ULTRA);
+        if (!next.animation()) clearPendingDrop();
         repaint();
     }
 
     void update(Position next, Move move, boolean animate) {
-        disappearing = animate && position != null && move != null ? position.captured(move) : null;
-        capturedSquare = disappearing != null && position.piece(move.to()) == null
-                ? move.to() - 8 * position.turn().forward : move == null ? -1 : move.to();
+        Point release = move != null && move.equals(droppedMove) ? droppedAt : null;
+        motion = animate && preferences.animation() ? MoveAnimation.from(position, move, release) : null;
+        clearPendingDrop();
         position = next;
         last = move;
         hint = null;
@@ -132,14 +135,25 @@ final class ChessBoardPanel extends JPanel {
             movableSquares[legal.from()] = true;
         }
         clearSelection();
-        if (animate && move != null) animator.triggerMove();
+        if (motion != null) animator.triggerMove(motion.durationMillis());
         else animator.clearMove();
         repaint();
     }
 
     void showHint(Move move) { hint = move; repaint(); }
     void flip() { setFlipped(!flipped); }
-    void setFlipped(boolean value) { flipped = value; clearSelection(); repaint(); }
+    void setFlipped(boolean value) {
+        if (flipped != value) clearPendingDrop();
+        flipped = value;
+        clearSelection();
+        repaint();
+    }
+
+    void clearPendingDrop() {
+        droppedMove = null;
+        droppedAt = null;
+        repaint();
+    }
 
     void selectSquare(int square) {
         if (position != null && select(square)) repaint();
@@ -186,7 +200,7 @@ final class ChessBoardPanel extends JPanel {
         return true;
     }
 
-    private boolean tryMove(int to) {
+    private boolean tryMove(int to, Point release) {
         List<Move> matching = candidates.stream().filter(move -> move.to() == to).toList();
         if (matching.isEmpty()) return false;
         Move move = matching.get(0);
@@ -195,7 +209,14 @@ final class ChessBoardPanel extends JPanel {
             if (kind == null) return false;
             move = matching.stream().filter(candidate -> candidate.promotion() == kind).findFirst().orElseThrow();
         }
-        if (playable.getAsBoolean()) onMove.accept(move);
+        if (playable.getAsBoolean()) {
+            if (release != null && preferences.animation()) {
+                droppedMove = move;
+                droppedAt = release;
+            }
+            onMove.accept(move);
+            if (droppedMove != null && playable.getAsBoolean()) clearPendingDrop();
+        }
         return true;
     }
 
@@ -215,11 +236,11 @@ final class ChessBoardPanel extends JPanel {
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, preferences.highQuality()
                 ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
+        double moveProgress = animator.moveProgress();
         var state = new BoardRenderer.RenderState(
                 getWidth(), getHeight(), position, flipped, theme, preferences,
                 last, hint, selected, hovered, candidates, playable.getAsBoolean(), check,
-                mouse, disappearing, capturedSquare,
-                animator.moveProgress(), animator.easedMoveProgress(), animator.pulse(),
+                mouse, droppedMove, droppedAt, moveProgress < 1 ? motion : null, moveProgress, animator.pulse(),
                 animator.isCelebrating(), animator.celebrationProgress(),
                 overlayTitle, overlaySubtitle, overlayAccent, (float) animator.overlayProgress());
         activeRenderer.paint(g, state);

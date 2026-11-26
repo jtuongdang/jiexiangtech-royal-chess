@@ -10,9 +10,17 @@ interface BoardRenderer {
     record RenderState(int width, int height, Position position, boolean flipped, String theme,
                        Preferences preferences, Move last, Move hint, int selected, int hovered,
                        List<Move> candidates, boolean playable, boolean check, Point dragPoint,
-                       Piece disappearing, int capturedSquare, double moveProgress, double easedMoveProgress,
+                       Move droppedMove, Point droppedAt, MoveAnimation motion, double moveProgress,
                        float pulse, boolean celebrating, double celebrationProgress,
-                       String overlayTitle, String overlaySubtitle, Color overlayAccent, float overlayAlpha) {}
+                       String overlayTitle, String overlaySubtitle, Color overlayAccent, float overlayAlpha) {
+        int heldSquare() { return droppedMove == null ? selected : droppedMove.from(); }
+        Point heldPoint() { return droppedAt == null ? dragPoint : droppedAt; }
+
+        boolean hidesPiece(int square) {
+            return (heldPoint() != null && square == heldSquare()) || (motion != null
+                    && (square == motion.move().to() || (motion.rook() != null && square == motion.rook().to())));
+        }
+    }
 
     void paint(Graphics2D g, RenderState state);
 

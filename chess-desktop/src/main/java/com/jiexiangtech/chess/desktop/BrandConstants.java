@@ -6,11 +6,12 @@ final class BrandConstants {
     static final String COMPANY_CHINESE = "杰祥科技";
     static final String COPYRIGHT = "© 2026 " + COMPANY + ". All rights reserved.";
     static final String REPOSITORY = "jiexiangtech-royal-chess";
+    static final String ONLINE_SERVER = "https://jiexiangtech-royal-chess.onrender.com";
 
     private BrandConstants() {}
 
     static String version() {
         String version = Main.class.getPackage().getImplementationVersion();
-        return version == null ? "1.0.0" : version;
+        return version == null ? "1.1.0" : version;
     }
 }

@@ -9,7 +9,7 @@ approved Splash/Login baseline and both official visual references.
 
 | Area | State |
 | --- | --- |
-| Maven and module boundaries | Implemented as four modules. Reactor is `com.jiexiangtech:royal-chess`. Domain has zero Swing/JDBC dependencies |
+| Maven and module boundaries | The desktop and online modules share the `com.jiexiangtech:royal-chess` reactor. Domain has zero Swing/JDBC dependencies |
 | Royal Focus Mode 2.5D | Implemented with exact `3×3` projective homography (`PerspectiveProjection`, `PerspectiveCoordinateMapper`), cached inverse-warped 64-square marble board (`PerspectiveTextureRenderer`), physical 3D front slab with metallic gold rails & sculpted crown/laurel emblem, ornate beveled gold frame & corner filigree, depth-sorted 2.5D billboard pieces (`PieceDepthSorter`, `RoyalPieceRenderer`), shadows & clipped reflections (`ShadowRenderer`, `ReflectionRenderer`), cinematic lighting (`CinematicLightingEngine`, `SpotlightRenderer`, `VignetteRenderer`), auto-dimming Left Sidebar & `RoyalBottomToolbar`, collapsible Move History/Captured drawer, and live 2D ↔ 2.5D switching (`FocusModeController`) |
 | Classic 2D Gameplay | Classical board rebuilt with the measured Interface-2 bezel, 64 square cells, eight marble samples and 12 redrawn pieces. Live toggle into Royal Focus 2.5D |
 | Preferences & SQLite | `Preferences.ViewMode` (`CLASSIC_2D`, `ROYAL_FOCUS_25D`) and `Preferences.GraphicsQuality` (`LOW`, `MEDIUM`, `HIGH`, `ULTRA`) persisted cleanly in SQLite without breaking existing schema migrations |
@@ -19,7 +19,8 @@ approved Splash/Login baseline and both official visual references.
 | Draw adjudication | Common material and sealed-pawn dead positions verified. General mate reachability remains incomplete |
 | Persistence | SQLite migration, PBKDF2, per-profile data, atomic snapshots, safe rollback and replay-based restore |
 | AI | Four levels, time limits, cancellation, analysis and optional external Stockfish validated with Stockfish 19 |
-| Desktop verification | Maven passed all 29 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
+| Piece motion | Classic and Focus share time-based easing, drag settling and capture/castling/promotion transitions. The Ultra setting requests an 8 ms repaint interval during moves |
+| Desktop verification | Maven passed all 37 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
 | Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two desktop clients verified invitation, moves, reconnect and match result over HTTPS/WebSocket |
 | GitHub | Public repository at `jtuongdang/jiexiangtech-royal-chess` |
 

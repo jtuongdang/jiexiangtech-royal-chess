@@ -9,8 +9,12 @@ import com.jiexiangtech.chess.domain.*;
 
 /** Top-down Classic 2D Royal Luxury board renderer. */
 final class Classic2DBoardRenderer implements BoardRenderer {
+    private record Surface(int width, int height, boolean flipped, String theme, boolean highQuality, double dpi) {}
+
     private final AssetManager assets;
     private final RoyalPieceRenderer pieceRenderer;
+    private Surface surface;
+    private BufferedImage cachedBoard;
 
     Classic2DBoardRenderer(AssetManager assets, RoyalPieceRenderer pieceRenderer) {
         this.assets = assets;
@@ -26,9 +30,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
     @Override
     public void paint(Graphics2D g, RenderState s) {
         BoardCoordinateMapper board = BoardCoordinateMapper.fit(s.width(), s.height(), s.flipped());
-        RoyalBoardFrame.paintOuterFrame(g, board, assets.classicFrame());
-
-        for (int square = 0; square < 64; square++) drawTile(g, board.bounds(square), square, s.theme());
+        paintBoard(g, board, s);
 
         if (s.last() != null) {
             fill(g, board.bounds(s.last().from()), new Color(238, 198, 86, 68));
@@ -74,47 +76,74 @@ final class Classic2DBoardRenderer implements BoardRenderer {
             outline(g, ht, RoyalStyle.SUCCESS, 2.2f);
         }
 
-        double t = s.moveProgress();
-        if (t < 1.0 && s.disappearing() != null && s.capturedSquare() >= 0) {
-            g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0.0, 1.0 - t)));
-            pieceRenderer.drawPiece(g, s.disappearing(), board.bounds(s.capturedSquare()),
+        MoveAnimation motion = s.motion();
+        if (motion != null && motion.captured() != null) {
+            g.setComposite(AlphaComposite.SrcOver.derive(MoveAnimation.captureAlpha(s.moveProgress())));
+            pieceRenderer.drawPiece(g, motion.captured(), board.bounds(motion.capturedSquare()),
                     s.preferences().pieceScale(), s.preferences().highQuality(), false);
             g.setComposite(AlphaComposite.SrcOver);
         }
 
         for (int square = 0; square < 64; square++) {
             Piece piece = s.position().piece(square);
-            if (piece != null && !(square == s.selected() && s.dragPoint() != null)
-                    && !(t < 1.0 && s.last() != null && square == s.last().to())) {
+            if (piece != null && !s.hidesPiece(square)) {
                 pieceRenderer.drawPiece(g, piece, board.bounds(square),
                         s.preferences().pieceScale(), s.preferences().highQuality(), false);
             }
         }
 
-        if (t < 1.0 && s.last() != null) {
-            Rectangle from = board.bounds(s.last().from()), to = board.bounds(s.last().to());
-            double eased = s.easedMoveProgress();
-            Rectangle moving = new Rectangle(
-                    from.x + (int) Math.round((to.x - from.x) * eased),
-                    from.y + (int) Math.round((to.y - from.y) * eased),
-                    from.width, from.height);
-            pieceRenderer.drawPiece(g, s.position().piece(s.last().to()), moving,
-                    s.preferences().pieceScale(), s.preferences().highQuality(), false);
+        if (motion != null) {
+            double progress = MoveAnimation.ease(s.moveProgress());
+            if (motion.rook() != null) {
+                drawTravel(g, board, s, s.position().piece(motion.rook().to()), motion.rook(), null, progress);
+            }
+            drawTravel(g, board, s, motion.piece(), motion.move(), motion.release(), progress);
         }
 
         if (s.hint() != null) drawHintArrow(g, board.bounds(s.hint().from()), board.bounds(s.hint().to()));
 
-        if (s.dragPoint() != null && s.selected() >= 0) {
-            int tile = board.tile();
-            pieceRenderer.drawPiece(g, s.position().piece(s.selected()),
-                    new Rectangle(s.dragPoint().x - tile / 2, s.dragPoint().y - tile / 2, tile, tile),
-                    s.preferences().pieceScale(), s.preferences().highQuality(), true);
+        if (s.heldPoint() != null && s.heldSquare() >= 0) {
+            pieceRenderer.drawPiece(g, s.position().piece(s.heldSquare()), underCursor(s.heldPoint(), board.tile()),
+                    s.preferences().pieceScale(), s.preferences().highQuality(), false);
         }
 
         RoyalBoardFrame.paintCoordinates(g, board);
         if (s.celebrating()) paintSparks(g, board.x() + board.tile() * 4, board.y() + board.tile() * 4, board.tile() * 8, s.celebrationProgress());
         if (s.overlayTitle() != null) paintOutcomeOverlay(g, board.x(), board.y(), board.tile() * 8, board.tile() * 8,
                 s.overlayTitle(), s.overlaySubtitle(), s.overlayAccent(), s.overlayAlpha());
+    }
+
+    private static Rectangle underCursor(Point point, int tile) {
+        return new Rectangle(point.x - tile / 2, point.y - tile / 2, tile, tile);
+    }
+
+    private void drawTravel(Graphics2D g, BoardCoordinateMapper mapper, RenderState s, Piece piece,
+                            Move move, Point release, double progress) {
+        Rectangle from = release == null ? mapper.bounds(move.from()) : underCursor(release, mapper.tile());
+        Rectangle to = mapper.bounds(move.to());
+        Graphics2D moving = (Graphics2D) g.create();
+        moving.translate((to.x - from.x) * progress, (to.y - from.y) * progress);
+        pieceRenderer.drawPiece(moving, piece, from, s.preferences().pieceScale(), s.preferences().highQuality(), false);
+        moving.dispose();
+    }
+
+    private void paintBoard(Graphics2D g, BoardCoordinateMapper mapper, RenderState s) {
+        if (s.width() <= 0 || s.height() <= 0) return;
+        var transform = g.getTransform();
+        double dpi = Math.max(1, Math.min(2, Math.hypot(transform.getScaleX(), transform.getShearY())));
+        var next = new Surface(s.width(), s.height(), s.flipped(), s.theme(), s.preferences().highQuality(), dpi);
+        if (!next.equals(surface)) {
+            cachedBoard = new BufferedImage((int) Math.ceil(s.width() * dpi), (int) Math.ceil(s.height() * dpi),
+                    BufferedImage.TYPE_INT_ARGB_PRE);
+            Graphics2D board = cachedBoard.createGraphics();
+            board.scale(dpi, dpi);
+            board.setRenderingHints(g.getRenderingHints());
+            RoyalBoardFrame.paintOuterFrame(board, mapper, assets.classicFrame());
+            for (int square = 0; square < 64; square++) drawTile(board, mapper.bounds(square), square, s.theme());
+            board.dispose();
+            surface = next;
+        }
+        g.drawImage(cachedBoard, 0, 0, s.width(), s.height(), null);
     }
 
     private void drawTile(Graphics2D g, Rectangle area, int square, String theme) {
