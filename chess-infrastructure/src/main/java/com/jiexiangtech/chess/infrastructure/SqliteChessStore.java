@@ -291,9 +291,17 @@ public final class SqliteChessStore implements ChessStore {
                 select.setLong(1, owner);
                 try (var rows = select.executeQuery()) {
                     if (!rows.next()) return Preferences.defaults(defaultLanguage);
+                    boolean hq = rows.getBoolean("quality");
+                    String vmRaw = appSetting(connection, "user:" + owner + ":view_mode");
+                    String gqRaw = appSetting(connection, "user:" + owner + ":graphics_quality");
+                    Preferences.ViewMode viewMode = vmRaw == null ? Preferences.ViewMode.ROYAL_FOCUS_25D
+                            : Preferences.ViewMode.valueOf(vmRaw);
+                    Preferences.GraphicsQuality quality = gqRaw == null
+                            ? (hq ? Preferences.GraphicsQuality.HIGH : Preferences.GraphicsQuality.MEDIUM)
+                            : Preferences.GraphicsQuality.valueOf(gqRaw);
                     return new Preferences(rows.getString("language"), rows.getString("theme_id"), rows.getBoolean("sound"),
                             rows.getBoolean("animation"), Preferences.Orientation.valueOf(rows.getString("orientation")),
-                            rows.getInt("piece_scale"), rows.getBoolean("quality"), rows.getBoolean("autosave"));
+                            rows.getInt("piece_scale"), hq, rows.getBoolean("autosave"), viewMode, quality);
                 }
             }
         });
@@ -327,8 +335,28 @@ public final class SqliteChessStore implements ChessStore {
                 save.setBoolean(9, prefs.autosave());
                 save.executeUpdate();
             }
+            saveAppSetting(connection, "user:" + owner + ":view_mode", prefs.viewMode().name());
+            saveAppSetting(connection, "user:" + owner + ":graphics_quality", prefs.graphicsQuality().name());
             return null;
         });
+    }
+
+    private static String appSetting(Connection connection, String key) throws SQLException {
+        try (var select = connection.prepareStatement("SELECT value FROM app_settings WHERE key=?")) {
+            select.setString(1, key);
+            try (var rows = select.executeQuery()) { return rows.next() ? rows.getString(1) : null; }
+        }
+    }
+
+    private static void saveAppSetting(Connection connection, String key, String value) throws SQLException {
+        try (var save = connection.prepareStatement("""
+                INSERT INTO app_settings VALUES(?,?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                """)) {
+            save.setString(1, key);
+            save.setString(2, value);
+            save.executeUpdate();
+        }
     }
 
     @Override public String rememberedUsername() {

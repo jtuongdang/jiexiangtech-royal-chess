@@ -1,0 +1,22 @@
+{
+  "id": "royal-focus-2.5d",
+  "name": "Royal Focus Mode 2.5D",
+  "referenceResolution": [
+    1024,
+    576
+  ],
+  "sidebarWidthRatio": 0.13,
+  "boardTopYRatio": 0.309,
+  "boardBottomYRatio": 0.826,
+  "boardThicknessRatio": 0.056,
+  "boardTopWidthStageRatio": 0.525,
+  "boardBottomWidthStageRatio": 0.842,
+  "pieceHeightRatios": {
+    "KING": 0.94,
+    "QUEEN": 0.9,
+    "BISHOP": 0.84,
+    "KNIGHT": 0.82,
+    "ROOK": 0.76,
+    "PAWN": 0.67
+  }
+}

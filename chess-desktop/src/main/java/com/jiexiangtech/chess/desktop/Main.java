@@ -122,20 +122,28 @@ public final class Main {
             frame.visualGuest();
             later(750, () -> {
                 saveImage(frame, folder, "dashboard");
-                frame.visualMatch();
-                later(600, () -> {
-                    saveImage(frame, folder, "gameplay");
-                    frame.setSize(frame.getMinimumSize());
+                frame.visualFocusMatch();
+                frame.setSize(1280, 748); // exact 16:9 content canvas matching 1024x576 reference ratio
+                frame.validate();
+                later(700, () -> {
+                    saveImage(frame, folder, "royal-focus-actual");
+                    frame.setSize(normalSize);
                     frame.validate();
-                    later(300, () -> {
-                        saveImage(frame, folder, "gameplay-minimum");
-                        if (!fullQa) {
-                            frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
-                            return;
-                        }
-                        frame.setSize(normalSize);
+                    frame.visualMatch();
+                    later(600, () -> {
+                        saveImage(frame, folder, "gameplay");
+                        frame.setSize(frame.getMinimumSize());
                         frame.validate();
-                        captureExtended(frame, folder);
+                        later(300, () -> {
+                            saveImage(frame, folder, "gameplay-minimum");
+                            if (!fullQa) {
+                                frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
+                                return;
+                            }
+                            frame.setSize(normalSize);
+                            frame.validate();
+                            captureExtended(frame, folder);
+                        });
                     });
                 });
             });

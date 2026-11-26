@@ -260,10 +260,14 @@ final class RoyalFrame extends JFrame {
     }
 
     private void mountShell() {
+        boolean focusActive = currentContent instanceof MatchView mv && mv.isFocusMode();
         boolean cinematicBackdrop = currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView;
+        String bgPath = focusActive ? BrandingManager.FOCUS_BG : cinematicBackdrop ? BrandingManager.GAMEPLAY_BG : null;
         JPanel root = new RoyalBackgroundPanel(new BorderLayout(),
-                cinematicBackdrop ? assets.brand(BrandingManager.GAMEPLAY_BG) : null, 0, false);
-        root.add(navigationPanel(currentPage, sidebarCompact), BorderLayout.WEST);
+                bgPath == null ? null : assets.brand(bgPath), 0, false);
+        RoyalNavigationPanel nav = navigationPanel(currentPage, sidebarCompact);
+        nav.setFocusDimmed(focusActive);
+        root.add(nav, BorderLayout.WEST);
         JPanel main = transparent(new BorderLayout());
         main.add(currentContent, BorderLayout.CENTER);
         footer = caption(" ");
@@ -274,6 +278,20 @@ final class RoyalFrame extends JFrame {
         getRootPane().setDefaultButton(null);
         revalidate();
         repaint();
+    }
+
+    void refreshShellAtmosphere() {
+        mountShell();
+    }
+
+    void updateViewMode(Preferences.ViewMode nextMode) {
+        prefs = prefs.withViewMode(nextMode);
+        refreshShellAtmosphere();
+        if (user == null) return;
+        long owner = user.id();
+        Preferences toSave = prefs;
+        jobs.submit(() -> { store.settings(owner, toSave); return toSave; },
+                saved -> {}, failure -> LoggerFactory.getLogger(RoyalFrame.class).warn("Failed to persist view mode", failure));
     }
 
     private void toggleSidebar() {
@@ -1364,6 +1382,8 @@ final class RoyalFrame extends JFrame {
         JComboBox<String> language = combo(new String[]{"en", "vi"}, code -> t(code.equals("en") ? "english" : "vietnamese"));
         JComboBox<String> theme = combo(availableThemes(), id -> t("theme." + id));
         JComboBox<Preferences.Orientation> orientation = combo(Preferences.Orientation.values(), value -> t("orientation." + value));
+        JComboBox<Preferences.ViewMode> viewMode = combo(Preferences.ViewMode.values(), value -> t("viewMode." + value));
+        JComboBox<Preferences.GraphicsQuality> graphicsQuality = combo(Preferences.GraphicsQuality.values(), value -> t("quality." + value));
         RoyalToggle sound = new RoyalToggle(t("sound"), prefs.sound());
         RoyalToggle animation = new RoyalToggle(t("animation"), prefs.animation());
         RoyalToggle quality = new RoyalToggle(t("quality"), prefs.highQuality());
@@ -1377,6 +1397,8 @@ final class RoyalFrame extends JFrame {
         language.setSelectedItem(prefs.language());
         theme.setSelectedItem(prefs.theme());
         orientation.setSelectedItem(prefs.orientation());
+        viewMode.setSelectedItem(prefs.viewMode());
+        graphicsQuality.setSelectedItem(prefs.graphicsQuality());
 
         // Section 1: Board & Visuals
         RoyalCard appearance = new RoyalCard(new BorderLayout(0, 14)).withGoldAccent();
@@ -1385,6 +1407,8 @@ final class RoyalFrame extends JFrame {
         JPanel visualGrid = transparent(new GridLayout(0, 2, 18, 14));
         visualGrid.add(labeledControl(t("language"), language));
         visualGrid.add(labeledControl(t("theme"), theme));
+        visualGrid.add(labeledControl(t("viewMode"), viewMode));
+        visualGrid.add(labeledControl(t("graphicsQuality"), graphicsQuality));
         visualGrid.add(labeledControl(t("orientation"), orientation));
         JPanel scaleBox = transparent(new BorderLayout(10, 0));
         scaleBox.add(scaleSlider, BorderLayout.CENTER);
@@ -1413,7 +1437,9 @@ final class RoyalFrame extends JFrame {
                 savePrefs(new Preferences((String) language.getSelectedItem(),
                         (String) theme.getSelectedItem(), sound.isSelected(), animation.isSelected(),
                         (Preferences.Orientation) orientation.getSelectedItem(), scaleSlider.getValue(),
-                        quality.isSelected(), autosave.isSelected())));
+                        quality.isSelected(), autosave.isSelected(),
+                        (Preferences.ViewMode) viewMode.getSelectedItem(),
+                        (Preferences.GraphicsQuality) graphicsQuality.getSelectedItem())));
         applyBtn.setBorder(new EmptyBorder(10, 22, 10, 22));
         RoyalButton resetBtn = button(t("reset"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO,
                 () -> savePrefs(Preferences.defaults(authLanguage)));
@@ -1517,7 +1543,23 @@ final class RoyalFrame extends JFrame {
         for (String move : "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 d7c6".split(" ")) game.play(Move.uci(move));
         game.pause();
         live(game);
-        if (match != null) match.boardPanel().selectSquare(Square.at(3, 1)); // d2 pawn selected with legal moves highlighted
+        if (match != null) {
+            match.setFocusMode(false, false);
+            match.boardPanel().selectSquare(Square.at(3, 1));
+        }
+    }
+
+    void visualFocusMatch() {
+        var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
+                MatchOptions.Level.HARD, 600_000, 5000, "royal"), System::nanoTime);
+        game.resume();
+        for (String move : "e2e4 d7d6".split(" ")) game.play(Move.uci(move));
+        game.pause();
+        live(game);
+        if (match != null) {
+            match.setFocusMode(true, false);
+            match.boardPanel().selectSquare(Square.at(4, 3)); // e4 pawn selected with e5 legal target highlighted
+        }
     }
 
     void visualNewGame() { newGame(MatchOptions.Mode.COMPUTER); }

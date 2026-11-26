@@ -14,11 +14,11 @@ final class RoyalGameClock extends JLabel {
     RoyalGameClock() {
         super("—", SwingConstants.CENTER);
         setOpaque(false);
-        setFont(mono(Font.BOLD, 23f));
+        setFont(mono(Font.BOLD, 21f));
         setForeground(MUTED);
-        setBorder(new EmptyBorder(6, 12, 6, 12));
-        setPreferredSize(new Dimension(106, 42));
-        setMinimumSize(new Dimension(96, 38));
+        setBorder(new EmptyBorder(5, 10, 5, 10));
+        setPreferredSize(new Dimension(94, 38));
+        setMinimumSize(new Dimension(86, 36));
     }
 
     void update(String text, boolean timed, boolean active, boolean lowTime) {

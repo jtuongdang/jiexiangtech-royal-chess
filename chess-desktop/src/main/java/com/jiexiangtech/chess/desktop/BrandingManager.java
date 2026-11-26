@@ -11,6 +11,7 @@ final class BrandingManager {
     static final String LOGIN = "backgrounds/login-background.png";
     static final String DASHBOARD = "backgrounds/dashboard-background.png";
     static final String GAMEPLAY_BG = "backgrounds/gameplay-background.png";
+    static final String FOCUS_BG = "backgrounds/royal-focus-background.png";
     static final String GAME = "branding/game-logo.png";
     static final String COMPANY = "branding/company-logo.png";
     static final String COMPANY_HORIZONTAL = "branding/company-horizontal.png";

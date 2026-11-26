@@ -97,6 +97,61 @@ final class RoyalPieceRenderer {
         g.drawImage(cached, dx, dy, dw, dh, null);
     }
 
+    /**
+     * Renders an upright 2.5D billboard piece anchored at (anchorX, anchorY) on the perspective tabletop,
+     * scaled proportionally to the local foreshortened square width, with contact/cast shadows and rim contrast.
+     */
+    Dimension drawPerspectivePiece(Graphics2D g, Piece piece, double anchorX, double anchorY, double localTileWidth,
+                                   int pieceScalePercent, boolean highQuality, boolean onDarkSquare,
+                                   double liftPixels, ShadowRenderer shadows, boolean directionalShadow) {
+        if (piece == null) return new Dimension(0, 0);
+        BufferedImage source = assets.piece(piece);
+        Rectangle srcBounds = assets.pieceBounds(piece);
+
+        double userScale = pieceScalePercent / 97.0;
+        // 2.5D tabletop proportions calibrated to royal-focus-reference.png (clear rank 1 & 2 separation)
+        double targetH = localTileWidth * 1.18 * heightRatio(piece.kind()) * userScale;
+        double maxW = localTileWidth * 0.84 * userScale;
+        double scale = Math.min(targetH / srcBounds.height, maxW / srcBounds.width);
+
+        int dw = Math.max(4, (int) Math.round(srcBounds.width * scale));
+        int dh = Math.max(4, (int) Math.round(srcBounds.height * scale));
+        int dx = (int) Math.round(anchorX - dw / 2.0);
+        int dy = (int) Math.round(anchorY - dh - liftPixels);
+
+        if (shadows != null) {
+            shadows.paintPieceShadow(g, anchorX, anchorY, dw, localTileWidth, liftPixels, directionalShadow);
+        }
+
+        // Subtle warm golden rim light behind black pieces on dark marble for effortless readability
+        if (piece.side() == Side.BLACK && onDarkSquare && liftPixels < 2.0) {
+            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.52),
+                    Math.max(10f, Math.max(dw, dh) * 0.58f), new Color(238, 198, 102, 74));
+        }
+        // Subtle grounding contrast halo behind white pieces on ivory marble
+        if (piece.side() == Side.WHITE && !onDarkSquare && liftPixels < 2.0) {
+            RoyalGlowEffect.paintAmbientSpotlight(g, (float) anchorX, (float) (dy + dh * 0.58),
+                    Math.max(10f, Math.max(dw, dh) * 0.52f), new Color(18, 14, 10, 52));
+        }
+
+        if (source == null) {
+            g.setColor(piece.side() == Side.WHITE ? RoyalStyle.IVORY : new Color(0x201913));
+            g.fillOval(dx, dy, dw, dh);
+            return new Dimension(dw, dh);
+        }
+
+        AffineTransform tx = g.getTransform();
+        double dpiScale = Math.max(1.0, Math.min(3.0, Math.hypot(tx.getScaleX(), tx.getShearY())));
+        int pw = Math.max(4, (int) Math.round(dw * dpiScale));
+        int ph = Math.max(4, (int) Math.round(dh * dpiScale));
+
+        BufferedImage cached = scaledSprite(piece, source, srcBounds, pw, ph, highQuality);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, highQuality
+                ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(cached, dx, dy, dw, dh, null);
+        return new Dimension(dw, dh);
+    }
+
     private BufferedImage scaledSprite(Piece piece, BufferedImage source, Rectangle srcBounds,
                                        int targetW, int targetH, boolean highQuality) {
         CacheKey key = new CacheKey(piece, targetW, targetH, highQuality);

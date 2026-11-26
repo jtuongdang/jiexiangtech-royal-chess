@@ -37,9 +37,14 @@ final class AssetManager {
         }
         for (String name : List.of("board", "board-grid", "tile-light", "tile-dark")) load("board/" + name + ".png");
         for (String path : List.of(BrandingManager.SPLASH, BrandingManager.LOGIN, BrandingManager.DASHBOARD,
-                BrandingManager.GAMEPLAY_BG, BrandingManager.GAME, BrandingManager.COMPANY,
+                BrandingManager.GAMEPLAY_BG, BrandingManager.FOCUS_BG, BrandingManager.GAME, BrandingManager.COMPANY,
                 BrandingManager.COMPANY_HORIZONTAL, BrandingManager.EMBLEM, "branding/app-icon.png")) {
             load(path, "assets/" + path);
+        }
+        for (String path : List.of("focus-mode/lighting/spotlight-mask.png", "focus-mode/lighting/vignette-mask.png",
+                "focus-mode/shadows/board-shadow.png", "focus-mode/textures/gold-bevel.png",
+                "focus-mode/frame/corner-ornament.png", "focus-mode/reflections/piece-reflection-mask.png")) {
+            load(path);
         }
         for (int size : new int[]{16, 32, 64, 128, 256, 512}) {
             String path = "icons/app-icon-" + size + ".png";
@@ -80,6 +85,7 @@ final class AssetManager {
     BufferedImage tile(boolean light) { return images.get(light ? "board/tile-light.png" : "board/tile-dark.png"); }
     List<String> missing() { return List.copyOf(missing); }
     BufferedImage brand(String path) { return images.get(path); }
+    BufferedImage focusAsset(String relativePath) { return images.get("focus-mode/" + relativePath); }
 
     List<Image> windowIcons() {
         var list = new ArrayList<Image>();

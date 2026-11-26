@@ -15,3 +15,10 @@
 - Use the private jiexiangtech-royal-chess repository and verify the remote before pushing. Preserve Git history and never force-push.
 - Record real build, platform, launcher and CI results. Only publish version tags whose CI matrix has verified the artifacts.
 - Keep Stockfish external to application packages. Retain third-party notices with distributed files.
+
+## Royal Focus Mode 2.5D Graphics Rules
+
+- Keep all 2.5D perspective rendering, homography projection, texture warping, lighting, shadows, and reflections strictly inside `chess-desktop` (Presentation Layer); `chess-domain`, `chess-application`, and `chess-infrastructure` must remain free of Swing and Java2D.
+- Preserve both **Classic 2D** and **Royal Focus 2.5D** gameplay modes with live in-match switching (`FocusModeController`) and SQLite-persisted `ViewMode` / `GraphicsQuality` preferences.
+- Always render all 64 squares and 12 Royal Luxury piece sprites dynamically via `PerspectiveTextureRenderer` and `RoyalPieceRenderer` (Retina-aware sprite caching and offscreen warped-board caching); never substitute static mockup screenshots for interactive boards.
+- Keep `docs/design/ROYAL_FOCUS_MODE.md`, `docs/design/royal-focus-reference.png`, `docs/screenshots/royal-focus-actual.png`, and `docs/screenshots/royal-focus-comparison.png` updated whenever Focus Mode geometry or visuals change.

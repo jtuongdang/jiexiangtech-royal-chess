@@ -17,121 +17,43 @@ final class MatchView extends JPanel {
     private final RoyalFrame frame;
     private final GameSession session;
     private final I18n text;
-    private final Preferences prefs;
+    private Preferences prefs;
+    private final FocusModeController focusController;
     private final ChessBoardPanel board;
     private final RoyalMoveHistory moveHistory;
     private final RoyalCapturedTray captures;
     private final JLabel saveStatus = caption(" ");
     private final RoyalPlayerCard whiteCard, blackCard;
-    private final JPanel playersStack;
-    private final RoyalButton saveBtn, undo, hint, resign, draw, sound, flipBtn, fullscreenBtn, pauseBtn;
     private final Timer tick;
+    private RoyalButton undoBtn, hintBtn, resignBtn, drawBtn, soundBtn;
+    private RoyalIconButton drawerToggleBtn;
+    private JPanel focusDrawer;
     private boolean active = true, soundEnabled, leaving, endDisplayed, flipped;
     private SwingWorker<ChessEngine.Analysis, Void> search;
     private int saveSequence;
 
     MatchView(RoyalFrame frame, GameSession session) {
-        super(new BorderLayout(16, 0));
+        super(new BorderLayout());
         this.frame = frame;
         this.session = session;
         this.text = frame.text();
         this.prefs = frame.prefs();
         this.soundEnabled = prefs.sound();
+        this.focusController = new FocusModeController(prefs.viewMode());
         setOpaque(false);
-        setBorder(new EmptyBorder(8, 12, 10, 16));
-
-        // =====================================================================
-        // CENTER CHESSBOARD STAGE (~55%): JIEXIANGTECH horizontal header + Large Framed Board
-        // =====================================================================
-        JPanel centerStage = transparent(new BorderLayout(0, 4));
-        JPanel brandHeader = transparent(new FlowLayout(FlowLayout.CENTER, 0, 2));
-        brandHeader.add(frame.branding().logo(BrandingManager.COMPANY_HORIZONTAL, 224, 44,
-                BrandConstants.COMPANY + " " + BrandConstants.COMPANY_CHINESE));
-        centerStage.add(brandHeader, BorderLayout.NORTH);
 
         board = new ChessBoardPanel(frame.assets(), prefs, session.options().theme(), this::canPlay,
                 options -> promote(this, frame.assets(), text, session.game().position().turn()), this::play);
         flipped = flip(prefs, session.options().human());
         board.setFlipped(flipped);
-        centerStage.add(board, BorderLayout.CENTER);
-        add(centerStage, BorderLayout.CENTER);
+        board.setFocusMode(focusController.isFocusMode());
 
-        // =====================================================================
-        // RIGHT GAME PANEL (~30%): Both Player Cards + Move History + Captured + Controls
-        // =====================================================================
-        JPanel rightPanel = transparent(new BorderLayout(0, 10));
-        rightPanel.setPreferredSize(new Dimension(358, 560));
-        rightPanel.setMinimumSize(new Dimension(308, 460));
-        rightPanel.setBorder(new EmptyBorder(8, 0, 4, 0));
-
-        // 1. Player Cards (Black + White stacked at top of Right Panel)
         whiteCard = buildPlayerCard(Side.WHITE);
         blackCard = buildPlayerCard(Side.BLACK);
-        playersStack = transparent(new GridLayout(2, 1, 0, 8));
-        placePlayers();
-        rightPanel.add(playersStack, BorderLayout.NORTH);
-
-        // 2. Move History (flexible center card)
         moveHistory = new RoyalMoveHistory(text, null);
-        rightPanel.add(moveHistory, BorderLayout.CENTER);
-
-        // 3. Lower Stack: Captured Pieces + Reference-Matched Control Grid
         captures = new RoyalCapturedTray(frame.assets(), text);
 
-        saveBtn = gameControl(text.get("save"), RoyalButton.Variant.GOLD_GLOW, RoyalIcons.Glyph.SAVE, () -> {
-            if (!leaving) persist(true, null);
-        });
-        undo = gameControl(text.get("undo"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO, this::undo);
-        hint = gameControl(text.get("hint"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HINT, this::hint);
-        draw = gameControl(text.get("draw"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.DRAW, this::draw);
-        resign = gameControl(text.get("resign"), RoyalButton.Variant.DANGER, RoyalIcons.Glyph.RESIGN, this::resign);
-        flipBtn = gameControl(text.get("flip"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.FLIP, this::flipBoard);
-        sound = gameControl(text.get(soundEnabled ? "soundOn" : "soundOff"), RoyalButton.Variant.SECONDARY,
-                soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF, this::sound);
-        fullscreenBtn = gameControl(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
-                RoyalIcons.Glyph.FULLSCREEN, frame::toggleFullscreen);
-        pauseBtn = gameControl(text.get("pause"), RoyalButton.Variant.GHOST, RoyalIcons.Glyph.PAUSE, frame::home);
-        pauseBtn.setPreferredSize(new Dimension(120, 32));
-
-        // Row 1: Save | Undo | Hint (3 equal columns)
-        JPanel row1 = transparent(new GridLayout(1, 3, 7, 0));
-        row1.add(saveBtn);
-        row1.add(undo);
-        row1.add(hint);
-
-        // Row 2: Draw (1/3) | Resign (2/3) — exact reference visual rhythm
-        JPanel row2 = transparent(new GridBagLayout());
-        GridBagConstraints rc = new GridBagConstraints();
-        rc.gridy = 0; rc.fill = GridBagConstraints.BOTH; rc.weighty = 1;
-        rc.gridx = 0; rc.weightx = 0.36; rc.insets = new Insets(0, 0, 0, 7);
-        row2.add(draw, rc);
-        rc.gridx = 1; rc.weightx = 0.64; rc.insets = new Insets(0, 0, 0, 0);
-        row2.add(resign, rc);
-
-        // Row 3: Flip Board | Sound On | Full Screen (3 equal columns)
-        JPanel row3 = transparent(new GridLayout(1, 3, 7, 0));
-        row3.add(flipBtn);
-        row3.add(sound);
-        row3.add(fullscreenBtn);
-
-        // Row 4: Save status + Pause & Return
-        JPanel row4 = transparent(new BorderLayout(8, 0));
-        saveStatus.setBorder(new EmptyBorder(0, 4, 0, 4));
-        row4.add(saveStatus, BorderLayout.WEST);
-        row4.add(pauseBtn, BorderLayout.CENTER);
-
-        JPanel controls = transparent(new GridLayout(0, 1, 0, 7));
-        controls.add(row1);
-        controls.add(row2);
-        controls.add(row3);
-        controls.add(row4);
-
-        JPanel southStack = transparent(new BorderLayout(0, 10));
-        southStack.add(captures, BorderLayout.NORTH);
-        southStack.add(controls, BorderLayout.SOUTH);
-        rightPanel.add(southStack, BorderLayout.SOUTH);
-
-        add(rightPanel, BorderLayout.EAST);
+        rebuildLayout();
 
         tick = new Timer(100, event -> onTick());
         tick.setCoalesce(true);
@@ -140,6 +62,231 @@ final class MatchView extends JPanel {
         tick.start();
         if (prefs.autosave()) persist(false, null);
         computer();
+    }
+
+    boolean isFocusMode() { return focusController.isFocusMode(); }
+    GameSession session() { return session; }
+    ChessBoardPanel boardPanel() { return board; }
+
+    void setFocusMode(boolean enabled, boolean persistChoice) {
+        Preferences.ViewMode next = enabled ? Preferences.ViewMode.ROYAL_FOCUS_25D : Preferences.ViewMode.CLASSIC_2D;
+        if (focusController.mode() == next) return;
+        focusController.setMode(next);
+        prefs = prefs.withViewMode(next);
+        board.setPreferences(prefs);
+        board.setFocusMode(enabled);
+        rebuildLayout();
+        refresh(false);
+        if (persistChoice) frame.updateViewMode(next);
+        else frame.refreshShellAtmosphere();
+    }
+
+    private void toggleViewMode() {
+        setFocusMode(!focusController.isFocusMode(), true);
+    }
+
+    private void rebuildLayout() {
+        removeAll();
+        if (focusController.isFocusMode()) {
+            buildFocus25DLayout();
+        } else {
+            buildClassic2DLayout();
+        }
+        revalidate();
+        repaint();
+    }
+
+    // =========================================================================
+    // ROYAL FOCUS MODE 2.5D LAYOUT (1:1 REFERENCE STRUCTURE)
+    // =========================================================================
+
+    private void buildFocus25DLayout() {
+        setLayout(new BorderLayout(0, 0));
+        setBorder(new EmptyBorder(6, 14, 6, 14));
+
+        // TOP AREA: JIEXIANGTECH horizontal logo + [Black Card | ChessMaster Royal Emblem | White Card]
+        JPanel topBlock = transparent(new BorderLayout(0, 4));
+
+        JPanel corpRow = transparent(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        corpRow.add(frame.branding().logo(BrandingManager.COMPANY_HORIZONTAL, 198, 38,
+                BrandConstants.COMPANY + " " + BrandConstants.COMPANY_CHINESE));
+        topBlock.add(corpRow, BorderLayout.NORTH);
+
+        JPanel playerBar = transparent(new GridBagLayout());
+        GridBagConstraints pc = new GridBagConstraints();
+        pc.gridy = 0; pc.fill = GridBagConstraints.NONE; pc.anchor = GridBagConstraints.WEST;
+        RoyalPlayerCard leftCard = flipped ? whiteCard : blackCard;
+        RoyalPlayerCard rightCard = flipped ? blackCard : whiteCard;
+        leftCard.setPreferredSize(new Dimension(346, 66));
+        rightCard.setPreferredSize(new Dimension(346, 66));
+
+        pc.gridx = 0; pc.weightx = 0.38; pc.insets = new Insets(0, 4, 0, 4);
+        playerBar.add(leftCard, pc);
+
+        pc.gridx = 1; pc.weightx = 0.24; pc.anchor = GridBagConstraints.CENTER; pc.insets = new Insets(0, 4, 0, 4);
+        playerBar.add(buildCenterWordmark(), pc);
+
+        pc.gridx = 2; pc.weightx = 0.38; pc.anchor = GridBagConstraints.EAST; pc.insets = new Insets(0, 4, 0, 4);
+        playerBar.add(rightCard, pc);
+
+        topBlock.add(playerBar, BorderLayout.SOUTH);
+        add(topBlock, BorderLayout.NORTH);
+
+        // CENTER STAGE: Dominant 2.5D Perspective Board (+ optional collapsible Move History / Captured drawer)
+        JPanel stageWrap = transparent(new BorderLayout(10, 0));
+        stageWrap.add(board, BorderLayout.CENTER);
+
+        focusDrawer = new RoyalPanel(new BorderLayout(0, 10), new Color(20, 18, 22, 232),
+                new Color(13, 12, 15, 240), LINE_GOLD, 14);
+        focusDrawer.setPreferredSize(new Dimension(306, 400));
+        focusDrawer.setBorder(new EmptyBorder(10, 10, 10, 10));
+        focusDrawer.add(moveHistory, BorderLayout.CENTER);
+        focusDrawer.add(captures, BorderLayout.SOUTH);
+        focusDrawer.setVisible(focusController.isDrawerOpen());
+        stageWrap.add(focusDrawer, BorderLayout.EAST);
+        add(stageWrap, BorderLayout.CENTER);
+
+        // BOTTOM HORIZONTAL PILL TOOLBAR (exact reference row + subtle Focus/Drawer/Pause utility pills)
+        RoyalButton saveBtn = RoyalBottomToolbar.pillAction(text.get("save"), RoyalButton.Variant.GOLD_GLOW,
+                RoyalIcons.Glyph.SAVE, () -> { if (!leaving) persist(true, null); });
+        undoBtn = RoyalBottomToolbar.pillAction(text.get("undo"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.UNDO, this::undo);
+        hintBtn = RoyalBottomToolbar.pillAction(text.get("hint"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.HINT, this::hint);
+        drawBtn = RoyalBottomToolbar.pillAction(text.get("draw"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.DRAW, this::draw);
+        resignBtn = RoyalBottomToolbar.pillAction(text.get("resign"), RoyalButton.Variant.DANGER,
+                RoyalIcons.Glyph.RESIGN, this::resign);
+        RoyalButton flipBtn = RoyalBottomToolbar.pillAction(text.get("flip"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.FLIP, this::flipBoard);
+        soundBtn = RoyalBottomToolbar.pillAction(text.get(soundEnabled ? "soundOn" : "soundOff"),
+                RoyalButton.Variant.SECONDARY, soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF, this::sound);
+        RoyalButton fullBtn = RoyalBottomToolbar.pillAction(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.FULLSCREEN, frame::toggleFullscreen);
+
+        drawerToggleBtn = new RoyalIconButton(RoyalIcons.Glyph.DOC_LIST, text.get("toggleHistoryDrawer"), 15, 34, () -> {
+            boolean open = focusController.toggleDrawer();
+            focusDrawer.setVisible(open);
+            drawerToggleBtn.setActive(open);
+            revalidate();
+            repaint();
+        });
+        drawerToggleBtn.setActive(focusController.isDrawerOpen());
+
+        RoyalIconButton modeSwitchBtn = new RoyalIconButton(RoyalIcons.Glyph.SPARK,
+                text.get("toggleFocusMode") + " (" + text.get("viewMode.CLASSIC_2D") + ")", 15, 34, this::toggleViewMode);
+        modeSwitchBtn.setActive(true);
+
+        RoyalIconButton pauseIconBtn = new RoyalIconButton(RoyalIcons.Glyph.PAUSE, text.get("pause"), 15, 34, frame::home);
+
+        RoyalBottomToolbar toolbar = new RoyalBottomToolbar(
+                saveBtn, undoBtn, hintBtn, drawBtn, resignBtn, flipBtn, soundBtn, fullBtn,
+                drawerToggleBtn, modeSwitchBtn, pauseIconBtn);
+        toolbar.setFocusDimmed(true);
+        add(toolbar, BorderLayout.SOUTH);
+    }
+
+    private static JPanel buildCenterWordmark() {
+        JPanel p = transparent(new GridBagLayout());
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0; c.gridy = 0; c.insets = new Insets(0, 0, 2, 0);
+        p.add(new JLabel(RoyalIcons.icon(RoyalIcons.Glyph.CROWN, 24, PALE)), c);
+
+        JLabel main = new JLabel("CHESSMASTER");
+        main.setForeground(new Color(0xF3D47E));
+        main.setFont(serif(Font.BOLD, 21));
+        c.gridy = 1; c.insets = new Insets(0, 0, 1, 0);
+        p.add(main, c);
+
+        JLabel sub = new JLabel("R O Y A L   E D I T I O N");
+        sub.setForeground(new Color(0xC9A750));
+        sub.setFont(sans(Font.BOLD, 9.5f));
+        c.gridy = 2; c.insets = new Insets(0, 0, 0, 0);
+        p.add(sub, c);
+        return p;
+    }
+
+    // =========================================================================
+    // CLASSIC 2D LAYOUT (PRESERVED 3-COLUMN LAYOUT WITH LIVE 2.5D SWITCH)
+    // =========================================================================
+
+    private void buildClassic2DLayout() {
+        setLayout(new BorderLayout(16, 0));
+        setBorder(new EmptyBorder(8, 12, 10, 16));
+
+        JPanel centerStage = transparent(new BorderLayout(0, 4));
+        JPanel brandHeader = transparent(new BorderLayout());
+        JPanel brandMid = transparent(new FlowLayout(FlowLayout.CENTER, 0, 2));
+        brandMid.add(frame.branding().logo(BrandingManager.COMPANY_HORIZONTAL, 224, 44,
+                BrandConstants.COMPANY + " " + BrandConstants.COMPANY_CHINESE));
+        brandHeader.add(brandMid, BorderLayout.CENTER);
+        RoyalButton focusSwitch = RoyalBottomToolbar.pillAction(text.get("viewMode.ROYAL_FOCUS_25D"),
+                RoyalButton.Variant.GOLD_GLOW, RoyalIcons.Glyph.SPARK, this::toggleViewMode);
+        JPanel swWrap = transparent(new GridBagLayout());
+        swWrap.add(focusSwitch);
+        brandHeader.add(swWrap, BorderLayout.EAST);
+        centerStage.add(brandHeader, BorderLayout.NORTH);
+
+        centerStage.add(board, BorderLayout.CENTER);
+        add(centerStage, BorderLayout.CENTER);
+
+        JPanel rightPanel = transparent(new BorderLayout(0, 10));
+        rightPanel.setPreferredSize(new Dimension(358, 560));
+        rightPanel.setMinimumSize(new Dimension(308, 460));
+        rightPanel.setBorder(new EmptyBorder(8, 0, 4, 0));
+
+        whiteCard.setPreferredSize(new Dimension(340, 72));
+        blackCard.setPreferredSize(new Dimension(340, 72));
+        JPanel playersStack = transparent(new GridLayout(2, 1, 0, 8));
+        playersStack.add(flipped ? whiteCard : blackCard);
+        playersStack.add(flipped ? blackCard : whiteCard);
+        rightPanel.add(playersStack, BorderLayout.NORTH);
+
+        rightPanel.add(moveHistory, BorderLayout.CENTER);
+
+        RoyalButton saveBtn = gameControl(text.get("save"), RoyalButton.Variant.GOLD_GLOW, RoyalIcons.Glyph.SAVE, () -> {
+            if (!leaving) persist(true, null);
+        });
+        undoBtn = gameControl(text.get("undo"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO, this::undo);
+        hintBtn = gameControl(text.get("hint"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HINT, this::hint);
+        drawBtn = gameControl(text.get("draw"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.DRAW, this::draw);
+        resignBtn = gameControl(text.get("resign"), RoyalButton.Variant.DANGER, RoyalIcons.Glyph.RESIGN, this::resign);
+        RoyalButton flipBtn = gameControl(text.get("flip"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.FLIP, this::flipBoard);
+        soundBtn = gameControl(text.get(soundEnabled ? "soundOn" : "soundOff"), RoyalButton.Variant.SECONDARY,
+                soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF, this::sound);
+        RoyalButton fullscreenBtn = gameControl(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.FULLSCREEN, frame::toggleFullscreen);
+        RoyalButton pauseBtn = gameControl(text.get("pause"), RoyalButton.Variant.GHOST, RoyalIcons.Glyph.PAUSE, frame::home);
+        pauseBtn.setPreferredSize(new Dimension(120, 32));
+
+        JPanel row1 = transparent(new GridLayout(1, 3, 7, 0));
+        row1.add(saveBtn); row1.add(undoBtn); row1.add(hintBtn);
+
+        JPanel row2 = transparent(new GridBagLayout());
+        GridBagConstraints rc = new GridBagConstraints();
+        rc.gridy = 0; rc.fill = GridBagConstraints.BOTH; rc.weighty = 1;
+        rc.gridx = 0; rc.weightx = 0.36; rc.insets = new Insets(0, 0, 0, 7);
+        row2.add(drawBtn, rc);
+        rc.gridx = 1; rc.weightx = 0.64; rc.insets = new Insets(0, 0, 0, 0);
+        row2.add(resignBtn, rc);
+
+        JPanel row3 = transparent(new GridLayout(1, 3, 7, 0));
+        row3.add(flipBtn); row3.add(soundBtn); row3.add(fullscreenBtn);
+
+        JPanel row4 = transparent(new BorderLayout(8, 0));
+        saveStatus.setBorder(new EmptyBorder(0, 4, 0, 4));
+        row4.add(saveStatus, BorderLayout.WEST);
+        row4.add(pauseBtn, BorderLayout.CENTER);
+
+        JPanel controls = transparent(new GridLayout(0, 1, 0, 7));
+        controls.add(row1); controls.add(row2); controls.add(row3); controls.add(row4);
+
+        JPanel southStack = transparent(new BorderLayout(0, 10));
+        southStack.add(captures, BorderLayout.NORTH);
+        southStack.add(controls, BorderLayout.SOUTH);
+        rightPanel.add(southStack, BorderLayout.SOUTH);
+
+        add(rightPanel, BorderLayout.EAST);
     }
 
     private RoyalPlayerCard buildPlayerCard(Side side) {
@@ -183,21 +330,11 @@ final class MatchView extends JPanel {
         return btn;
     }
 
-    GameSession session() { return session; }
-    ChessBoardPanel boardPanel() { return board; }
-
-    private void placePlayers() {
-        playersStack.removeAll();
-        playersStack.add(flipped ? whiteCard : blackCard);
-        playersStack.add(flipped ? blackCard : whiteCard);
-        playersStack.revalidate();
-        playersStack.repaint();
-    }
-
     private void flipBoard() {
         flipped = !flipped;
         board.flip();
-        placePlayers();
+        rebuildLayout();
+        refresh(false);
     }
 
     private boolean canPlay() { return active && !leaving && session.game().outcome() == null && !session.computerTurn(); }
@@ -238,10 +375,12 @@ final class MatchView extends JPanel {
         moveHistory.update(game, game.plyCount());
         captures.update(game, game.plyCount());
 
-        undo.setEnabled(session.canUndo());
-        hint.setEnabled(canPlay());
-        resign.setEnabled(game.outcome() == null);
-        draw.setEnabled(canPlay() && (canClaim() || session.options().mode() == MatchOptions.Mode.LOCAL && game.plyCount() >= 2));
+        if (undoBtn != null) undoBtn.setEnabled(session.canUndo());
+        if (hintBtn != null) hintBtn.setEnabled(canPlay());
+        if (resignBtn != null) resignBtn.setEnabled(game.outcome() == null);
+        if (drawBtn != null) {
+            drawBtn.setEnabled(canPlay() && (canClaim() || session.options().mode() == MatchOptions.Mode.LOCAL && game.plyCount() >= 2));
+        }
         paintClocks();
     }
 
@@ -337,8 +476,10 @@ final class MatchView extends JPanel {
 
     private void sound() {
         soundEnabled = !soundEnabled;
-        sound.setText(text.get(soundEnabled ? "soundOn" : "soundOff"));
-        sound.setGlyph(soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF);
+        if (soundBtn != null) {
+            soundBtn.setText(text.get(soundEnabled ? "soundOn" : "soundOff"));
+            soundBtn.setGlyph(soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF);
+        }
         if (soundEnabled) frame.sounds().play("move");
     }
 

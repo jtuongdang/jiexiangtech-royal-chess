@@ -12,10 +12,14 @@ import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 final class RoyalNavigationPanel extends JPanel {
     record Item(String id, String label, RoyalIcons.Glyph glyph, Runnable action) {}
 
-    private static final int EXPANDED_WIDTH = 214;
-    private static final int COMPACT_WIDTH = 66;
+    private static final int EXPANDED_WIDTH = 194;
+    private static final int COMPACT_WIDTH = 64;
     private final AssetManager assets;
     private final boolean compact;
+    private boolean focusDimmed;
+    private boolean hovered;
+    private float fadeAlpha = 1.0f;
+    private final Timer fadeTimer;
 
     RoyalNavigationPanel(BrandingManager branding, AssetManager assets, List<Item> items, String selectedId,
                          String playerName, String aboutLabel, String signOutLabel, String toggleTooltip,
@@ -25,7 +29,18 @@ final class RoyalNavigationPanel extends JPanel {
         this.compact = compact;
         setOpaque(false);
         setPreferredSize(new Dimension(compact ? COMPACT_WIDTH : EXPANDED_WIDTH, 480));
-        setBorder(new EmptyBorder(14, compact ? 8 : 14, 12, compact ? 9 : 14));
+        setBorder(new EmptyBorder(14, compact ? 8 : 12, 10, compact ? 9 : 12));
+        fadeTimer = new Timer(16, e -> {
+            float target = (!focusDimmed || hovered) ? 1.0f : 0.78f;
+            float diff = target - fadeAlpha;
+            if (Math.abs(diff) < 0.02f) {
+                fadeAlpha = target;
+                ((Timer) e.getSource()).stop();
+            } else {
+                fadeAlpha += diff * 0.22f;
+            }
+            repaint();
+        });
 
         // Top brand mark + compact toggle
         JPanel top = transparent(new BorderLayout(0, 6));
@@ -85,6 +100,43 @@ final class RoyalNavigationPanel extends JPanel {
             ornamentFooter.add(signOutRow, BorderLayout.SOUTH);
             add(ornamentFooter, BorderLayout.SOUTH);
         }
+        installHoverListeners(this);
+    }
+
+    void setFocusDimmed(boolean dimmed) {
+        this.focusDimmed = dimmed;
+        fadeAlpha = dimmed && !hovered ? 0.80f : 1.0f;
+        repaint();
+    }
+
+    private void installHoverListeners(Container root) {
+        var listener = new java.awt.event.MouseAdapter() {
+            @Override public void mouseEntered(java.awt.event.MouseEvent e) {
+                if (!hovered) { hovered = true; fadeTimer.start(); }
+            }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) {
+                Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), RoyalNavigationPanel.this);
+                if (!contains(p) && hovered) { hovered = false; fadeTimer.start(); }
+            }
+        };
+        root.addMouseListener(listener);
+        for (Component c : root.getComponents()) {
+            if (c instanceof Container sub) installHoverListeners(sub);
+            else c.addMouseListener(listener);
+        }
+    }
+
+    @Override public void removeNotify() { fadeTimer.stop(); super.removeNotify(); }
+
+    @Override public void paint(Graphics graphics) {
+        if (fadeAlpha >= 0.99f) {
+            super.paint(graphics);
+            return;
+        }
+        Graphics2D g = (Graphics2D) graphics.create();
+        g.setComposite(AlphaComposite.SrcOver.derive(Math.max(0.45f, fadeAlpha)));
+        super.paint(g);
+        g.dispose();
     }
 
     @Override protected void paintComponent(Graphics graphics) {

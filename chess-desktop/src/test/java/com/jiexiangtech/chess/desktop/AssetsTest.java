@@ -65,6 +65,22 @@ class AssetsTest {
                     board.paint(graphics);
                     graphics.dispose();
                     assertNotEquals(0, image.getRGB(mapper.x() + 2, mapper.y() + 2) >>> 24);
+
+                    // Verify 2.5D Royal Focus perspective homography round-trips all 64 squares & renders cleanly
+                    var pMapper = PerspectiveCoordinateMapper.fit(1080, 620, flipped);
+                    for (int square = 0; square < 64; square++) {
+                        var center = pMapper.squareCenter(square);
+                        assertEquals(square, pMapper.boardSquareAt(center.x, center.y));
+                    }
+                    assertEquals(-1, pMapper.boardSquareAt(0, 0));
+                    board.setFocusMode(true);
+                    board.setSize(1080, 620);
+                    var focusImg = new BufferedImage(1080, 620, BufferedImage.TYPE_INT_ARGB);
+                    var fg = focusImg.createGraphics();
+                    board.paint(fg);
+                    fg.dispose();
+                    var mid = pMapper.squareCenter(Square.at(4, 3));
+                    assertNotEquals(0, focusImg.getRGB((int) mid.x, (int) mid.y) >>> 24);
                 }
             }
         });
