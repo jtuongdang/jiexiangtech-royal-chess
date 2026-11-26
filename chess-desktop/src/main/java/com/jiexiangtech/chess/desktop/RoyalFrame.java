@@ -9,21 +9,20 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.DefaultTableModel;
 import org.slf4j.LoggerFactory;
-import com.jiexiangtech.chess.infrastructure.ChessEngines;
 import com.jiexiangtech.chess.application.*;
 import com.jiexiangtech.chess.domain.*;
+import com.jiexiangtech.chess.infrastructure.ChessEngines;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 import static com.jiexiangtech.chess.desktop.ViewParts.*;
 
@@ -34,6 +33,10 @@ final class RoyalFrame extends JFrame {
     private record ImportedFile(String raw, Pgn.Imported pgn) {}
     private record LoadedGame(MatchSnapshot snapshot, GameSession session) {}
     private enum Page { HOME, NEW, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS }
+
+    private static final List<String> ALL_ACHIEVEMENTS = List.of(
+            "first-victory", "checkmate-master", "win-streak",
+            "puzzle-master", "ai-challenger", "royal-champion");
 
     private final ChessStore store;
     private final Accounts accounts;
@@ -55,6 +58,9 @@ final class RoyalFrame extends JFrame {
     private String authLanguage;
     private Rectangle windowedBounds;
     private boolean closing;
+    private boolean sidebarCompact;
+    private Page currentPage = Page.HOME;
+    private Component currentContent;
 
     RoyalFrame(ChessStore store, Passwords passwords, AssetManager assets, ChessEngines engines,
                String remembered, Preferences initialPreferences) {
@@ -72,7 +78,7 @@ final class RoyalFrame extends JFrame {
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(1020, 690));
         Rectangle available = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
-        setSize(Math.min(1330, available.width), Math.min(865, available.height));
+        setSize(Math.min(1360, available.width), Math.min(880, available.height));
         setLocationRelativeTo(null);
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent e) { navigate(RoyalFrame.this::shutdown); }
@@ -85,6 +91,7 @@ final class RoyalFrame extends JFrame {
     AssetManager assets() { return assets; }
     SoundManager sounds() { return sounds; }
     ChessEngines engines() { return engines; }
+    BrandingManager branding() { return branding; }
 
     void setStatus(String message) { if (footer != null) footer.setText(message); }
 
@@ -97,6 +104,10 @@ final class RoyalFrame extends JFrame {
         }
         return t("playerLocal", t("side." + side));
     }
+
+    // =========================================================================
+    // APPROVED LOGIN / REGISTRATION SCREEN (PRESERVED BASELINE)
+    // =========================================================================
 
     private void auth(boolean registering) {
         long token = ++generation;
@@ -207,6 +218,10 @@ final class RoyalFrame extends JFrame {
         dashboard();
     }
 
+    // =========================================================================
+    // NAVIGATION & APP SHELL
+    // =========================================================================
+
     private void navigate(Runnable destination) {
         if (closing) return;
         if (match != null) match.leave(destination);
@@ -216,57 +231,55 @@ final class RoyalFrame extends JFrame {
     void home() { navigate(this::dashboard); }
 
     private long show(Page selected, Component content) {
+        return show(selected, content, false);
+    }
+
+    private long show(Page selected, Component content, boolean compactSidebar) {
         ++generation;
         if (match != null && match != content) { match.close(); match = null; }
         if (replay != null && replay != content) { replay.close(); replay = null; }
         if (puzzle != content) puzzle = null;
-        JPanel root = new JPanel(new BorderLayout());
-        root.add(sidebar(selected), BorderLayout.WEST);
+        this.currentPage = selected;
+        this.currentContent = content;
+        this.sidebarCompact = compactSidebar;
+        mountShell();
+        return generation;
+    }
+
+    private void mountShell() {
+        JPanel root = new RoyalBackgroundPanel(new BorderLayout(), null, 0, false);
+        root.add(navigationPanel(currentPage, sidebarCompact), BorderLayout.WEST);
         JPanel main = transparent(new BorderLayout());
-        main.add(content, BorderLayout.CENTER);
-        footer = label(" ", MUTED);
-        footer.setBorder(new EmptyBorder(0, 25, 5, 10));
+        main.add(currentContent, BorderLayout.CENTER);
+        footer = caption(" ");
+        footer.setBorder(new EmptyBorder(0, 28, 6, 12));
         main.add(footer, BorderLayout.SOUTH);
         root.add(main, BorderLayout.CENTER);
         setContentPane(root);
         getRootPane().setDefaultButton(null);
         revalidate();
         repaint();
-        return generation;
     }
 
-    private JPanel sidebar(Page selected) {
-        JPanel sidebar = new JPanel(new BorderLayout(0, 18));
-        sidebar.setBackground(SURFACE);
-        sidebar.setPreferredSize(new Dimension(194, 480));
-        sidebar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, LINE),
-                new EmptyBorder(20, 13, 14, 13)));
-        sidebar.add(branding.logo(BrandingManager.GAME, 166, 96, BrandConstants.PRODUCT), BorderLayout.NORTH);
-        JPanel menu = transparent(new GridLayout(0, 1, 0, 7));
-        sidebarEntry(menu, selected, Page.HOME, "home", this::dashboard);
-        sidebarEntry(menu, selected, Page.NEW, "newGame", () -> newGame(MatchOptions.Mode.LOCAL));
-        sidebarEntry(menu, selected, Page.PUZZLES, "puzzles", this::puzzleList);
-        sidebarEntry(menu, selected, Page.HISTORY, "history", this::history);
-        sidebarEntry(menu, selected, Page.LEADERBOARD, "leaderboard", this::leaderboard);
-        sidebarEntry(menu, selected, Page.STATISTICS, "statistics", this::statistics);
-        sidebarEntry(menu, selected, Page.ACHIEVEMENTS, "achievements", this::achievements);
-        sidebarEntry(menu, selected, Page.SETTINGS, "settings", this::settings);
-        var nav = transparent(new BorderLayout());
-        nav.add(menu, BorderLayout.NORTH);
-        sidebar.add(nav, BorderLayout.CENTER);
-        var name = label(display(), PALE);
-        name.setToolTipText(display());
-        JPanel accountActions = transparent(new GridLayout(0, 1, 0, 5));
-        accountActions.add(button(t("about"), false, this::about));
-        accountActions.add(button(t("signOut"), false, () -> navigate(this::signOut)));
-        sidebar.add(stack(name, Box.createVerticalStrut(7), accountActions), BorderLayout.SOUTH);
-        return sidebar;
+    private void toggleSidebar() {
+        sidebarCompact = !sidebarCompact;
+        mountShell();
     }
 
-    private void sidebarEntry(JPanel menu, Page selected, Page item, String key, Runnable action) {
-        var entry = button(t(key), item == selected, () -> navigate(action));
-        entry.setHorizontalAlignment(SwingConstants.LEFT);
-        menu.add(entry);
+    private RoyalNavigationPanel navigationPanel(Page selected, boolean compact) {
+        List<RoyalNavigationPanel.Item> items = List.of(
+                new RoyalNavigationPanel.Item(Page.HOME.name(), t("home"), RoyalIcons.Glyph.HOME, () -> navigate(this::dashboard)),
+                new RoyalNavigationPanel.Item(Page.NEW.name(), t("newGame"), RoyalIcons.Glyph.NEW_GAME, () -> navigate(() -> newGame(MatchOptions.Mode.LOCAL))),
+                new RoyalNavigationPanel.Item(Page.PUZZLES.name(), t("puzzles"), RoyalIcons.Glyph.PUZZLES, () -> navigate(this::puzzleList)),
+                new RoyalNavigationPanel.Item(Page.HISTORY.name(), t("history"), RoyalIcons.Glyph.HISTORY, () -> navigate(this::history)),
+                new RoyalNavigationPanel.Item(Page.LEADERBOARD.name(), t("leaderboard"), RoyalIcons.Glyph.LEADERBOARD, () -> navigate(this::leaderboard)),
+                new RoyalNavigationPanel.Item(Page.STATISTICS.name(), t("statistics"), RoyalIcons.Glyph.STATISTICS, () -> navigate(this::statistics)),
+                new RoyalNavigationPanel.Item(Page.ACHIEVEMENTS.name(), t("achievements"), RoyalIcons.Glyph.ACHIEVEMENTS, () -> navigate(this::achievements)),
+                new RoyalNavigationPanel.Item(Page.SETTINGS.name(), t("settings"), RoyalIcons.Glyph.SETTINGS, () -> navigate(this::settings))
+        );
+        return new RoyalNavigationPanel(branding, items, selected.name(), display(),
+                t("about"), t("signOut"), t("toggleSidebar"), compact,
+                this::toggleSidebar, this::about, () -> navigate(this::signOut));
     }
 
     private void signOut() {
@@ -293,69 +306,193 @@ final class RoyalFrame extends JFrame {
                 e -> { if (token == generation) error("storeError", e); });
     }
 
+    // =========================================================================
+    // HOME / DASHBOARD SCREEN
+    // =========================================================================
+
     private void dashboard() {
         long owner = user.id();
         load(Page.HOME, "home", () -> new HomeData(store.profile(owner), store.history(owner)), data -> {
             profile = data.profile();
             JPanel page = padded();
-            var hero = branding.background(BrandingManager.DASHBOARD, new BorderLayout());
-            hero.setPreferredSize(new Dimension(750, 248));
-            JPanel heroText = stack(branding.logo(BrandingManager.COMPANY, 128, 93, BrandConstants.COMPANY), Box.createVerticalStrut(9),
-                    title(t("welcome", display()), 39), Box.createVerticalStrut(21),
-                    row(button(t("quickPlay"), true, this::quickPlay), button(t("computer"), false, () -> newGame(MatchOptions.Mode.COMPUTER))));
-            heroText.setBorder(new EmptyBorder(38, 23, 15, 8));
-            hero.add(heroText, BorderLayout.WEST);
 
+            // Cinematic Hero Banner
+            RoyalBackgroundPanel hero = new RoyalBackgroundPanel(new BorderLayout(),
+                    assets.brand(BrandingManager.DASHBOARD), 20, true);
+            hero.setPreferredSize(new Dimension(820, 274));
+            hero.setMaximumSize(new Dimension(Integer.MAX_VALUE, 274));
+
+            JPanel brandBadge = row(
+                    branding.logo(BrandingManager.EMBLEM, 36, 26, BrandConstants.COMPANY),
+                    eyebrow(BrandConstants.COMPANY + "  ·  " + BrandConstants.PRODUCT));
+            JLabel welcomeTitle = title(t("welcome", display()), 40);
+            JLabel subtitle = new JLabel(t("homeSubtitle"));
+            subtitle.setForeground(new Color(0xD3CCBF));
+            subtitle.setFont(sans(Font.PLAIN, 15f));
+
+            JPanel ctaRow = transparent(new FlowLayout(FlowLayout.LEFT, 10, 0));
+            RoyalButton quickBtn = button(t("quickPlay"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.NEW_GAME, this::quickPlay);
+            quickBtn.setBorder(new EmptyBorder(10, 18, 10, 18));
+            RoyalButton cpuBtn = button(t("computer"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.CPU,
+                    () -> newGame(MatchOptions.Mode.COMPUTER));
+            cpuBtn.setBorder(new EmptyBorder(10, 18, 10, 18));
+            ctaRow.add(quickBtn);
+            ctaRow.add(cpuBtn);
+            data.history().stream().filter(item -> item.outcome() == null).findFirst().ifPresent(saved -> {
+                RoyalButton resumeBtn = button(t("resume"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.PLAY,
+                        () -> openSaved(saved, true));
+                resumeBtn.setBorder(new EmptyBorder(10, 18, 10, 18));
+                ctaRow.add(resumeBtn);
+            });
+
+            JPanel heroContent = stack(brandBadge, Box.createVerticalStrut(14), welcomeTitle,
+                    Box.createVerticalStrut(6), subtitle, Box.createVerticalStrut(22), ctaRow);
+            heroContent.setBorder(new EmptyBorder(28, 30, 26, 20));
+            hero.add(heroContent, BorderLayout.WEST);
+
+            // Summary Stat Cards
             JPanel metrics = metricGrid(profile, false);
-            JPanel section = transparent(new BorderLayout(0, 11));
-            section.add(heading(t("recent"), button(t("history"), false, this::history)), BorderLayout.NORTH);
-            var games = stack();
-            if (data.history().isEmpty()) games.add(cardLabel(t("emptyHistory")));
-            for (var saved : data.history().stream().limit(4).toList()) {
-                JPanel item = card(new BorderLayout(10, 0));
-                item.add(stack(label(t("mode." + saved.options().mode()), TEXT),
-                        label(date(saved.updated()) + "  ·  " + resultLabel(saved.options(), saved.outcome()), MUTED)), BorderLayout.CENTER);
-                item.add(button(t(saved.outcome() == null ? "resume" : "replay"), false, () -> openSaved(saved, saved.outcome() == null)),
-                        BorderLayout.EAST);
-                games.add(item);
-                gap(games, 7);
+
+            // Recent Games Section
+            JPanel recentSection = transparent(new BorderLayout(0, 12));
+            recentSection.add(heading(t("recent"), null,
+                    button(t("history"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HISTORY, this::history)),
+                    BorderLayout.NORTH);
+
+            JPanel gamesList = stack();
+            if (data.history().isEmpty()) {
+                RoyalCard emptyCard = new RoyalCard(new BorderLayout(16, 0));
+                emptyCard.setBorder(new EmptyBorder(20, 22, 20, 22));
+                emptyCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 96));
+                JPanel iconWrap = transparent(new GridBagLayout());
+                iconWrap.add(new JLabel(RoyalIcons.icon(RoyalIcons.Glyph.CROWN, 28, GOLD)));
+                JPanel emptyText = stack(
+                        title(t("emptyHistory"), 19),
+                        Box.createVerticalStrut(4),
+                        caption(t("emptyHistoryHint")));
+                JPanel textWrap = transparent(new GridBagLayout());
+                GridBagConstraints tc = new GridBagConstraints();
+                tc.anchor = GridBagConstraints.WEST; tc.weightx = 1; tc.fill = GridBagConstraints.HORIZONTAL;
+                textWrap.add(emptyText, tc);
+                JPanel actionWrap = transparent(new GridBagLayout());
+                RoyalButton cta = button(t("newGame"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.NEW_GAME,
+                        () -> newGame(MatchOptions.Mode.COMPUTER));
+                cta.setBorder(new EmptyBorder(9, 16, 9, 16));
+                actionWrap.add(cta);
+                emptyCard.add(iconWrap, BorderLayout.WEST);
+                emptyCard.add(textWrap, BorderLayout.CENTER);
+                emptyCard.add(actionWrap, BorderLayout.EAST);
+                gamesList.add(emptyCard);
+            } else {
+                for (var saved : data.history().stream().limit(4).toList()) {
+                    gamesList.add(gameSummaryCard(saved, false));
+                    gap(gamesList, 8);
+                }
             }
-            section.add(games, BorderLayout.CENTER);
-            data.history().stream().filter(item -> item.outcome() == null).findFirst().ifPresent(saved ->
-                    heroText.add(row(button(t("resume"), false, () -> openSaved(saved, true)))));
-            JPanel body = stack(hero, Box.createVerticalStrut(13), metrics, Box.createVerticalStrut(17), section);
-            page.add(scroll(body), BorderLayout.CENTER);
+            recentSection.add(gamesList, BorderLayout.CENTER);
+
+            JPanel body = stack(hero, Box.createVerticalStrut(18), metrics, Box.createVerticalStrut(22), recentSection);
+            body.setBorder(new EmptyBorder(0, 0, 12, 4));
+            JPanel bodyHolder = transparent(new BorderLayout());
+            bodyHolder.add(body, BorderLayout.NORTH);
+            page.add(scroll(bodyHolder), BorderLayout.CENTER);
             show(Page.HOME, page);
         });
     }
 
     private JPanel metricGrid(ChessStore.Profile player, boolean expanded) {
-        JPanel metrics = transparent(new GridLayout(0, 4, 9, 9));
-        metrics.add(metric("played", player.played()));
-        metrics.add(metric("wins", player.wins()));
-        metrics.add(metric("rating", player.rating()));
+        JPanel metrics = transparent(new GridLayout(0, 4, 12, 12));
+        metrics.add(metricCard("played", player.played(), RoyalIcons.Glyph.NEW_GAME, IVORY, false));
+        metrics.add(metricCard("wins", player.wins(), RoyalIcons.Glyph.TROPHY, SUCCESS, false));
+        metrics.add(metricCard("rating", player.rating(), RoyalIcons.Glyph.CROWN, PALE, true));
         int rate = player.played() == 0 ? 0 : (int) Math.round(100d * player.wins() / player.played());
-        metrics.add(metric("winRate", rate + "%"));
+        metrics.add(metricCard("winRate", rate + "%", RoyalIcons.Glyph.STATISTICS, IVORY, false));
         if (expanded) {
-            metrics.add(metric("losses", player.losses()));
-            metrics.add(metric("draws", player.draws()));
-            metrics.add(metric("streak", player.streak()));
-            metrics.add(metric("points", player.puzzlePoints()));
+            metrics.add(metricCard("losses", player.losses(), RoyalIcons.Glyph.RESIGN, DANGER_TEXT, false));
+            metrics.add(metricCard("draws", player.draws(), RoyalIcons.Glyph.DRAW, MUTED, false));
+            metrics.add(metricCard("streak", player.streak(), RoyalIcons.Glyph.SPARK, PALE, false));
+            metrics.add(metricCard("points", player.puzzlePoints(), RoyalIcons.Glyph.PUZZLES, PALE, false));
         }
-        metrics.setMaximumSize(new Dimension(Integer.MAX_VALUE, expanded ? 230 : 112));
+        metrics.setMaximumSize(new Dimension(Integer.MAX_VALUE, expanded ? 248 : 118));
         return metrics;
     }
 
-    private JPanel metric(String key, Object value) {
-        var card = card(new BorderLayout(0, 5));
-        card.add(label(t(key), MUTED), BorderLayout.NORTH);
-        card.add(title(String.valueOf(value), 30), BorderLayout.CENTER);
+    private RoyalCard metricCard(String key, Object value, RoyalIcons.Glyph glyph, Color valueColor, boolean highlight) {
+        RoyalCard card = new RoyalCard(new BorderLayout(0, 8));
+        if (highlight) card.withGoldAccent();
+        card.setBorder(new EmptyBorder(14, 18, 16, 18));
+
+        JPanel top = transparent(new BorderLayout(8, 0));
+        JLabel lbl = caption(t(key));
+        lbl.setFont(sans(Font.BOLD, 12f));
+        JLabel icon = new JLabel(RoyalIcons.icon(glyph, 17, highlight ? GOLD : MUTED));
+        top.add(lbl, BorderLayout.WEST);
+        top.add(icon, BorderLayout.EAST);
+
+        JLabel val = title(String.valueOf(value), 31);
+        val.setForeground(valueColor);
+        card.add(top, BorderLayout.NORTH);
+        card.add(val, BorderLayout.CENTER);
         return card;
     }
 
+    private RoyalCard gameSummaryCard(ChessStore.Summary saved, boolean showExtraActions) {
+        RoyalCard card = new RoyalCard(new BorderLayout(14, 0));
+        card.setBorder(new EmptyBorder(13, 16, 13, 16));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 76));
+
+        boolean vsCpu = saved.options().mode() == MatchOptions.Mode.COMPUTER;
+        JPanel iconBadge = new RoyalPanel(new GridBagLayout(), new Color(0x231F18), new Color(0x161411), LINE_GOLD, 11);
+        iconBadge.setPreferredSize(new Dimension(42, 42));
+        iconBadge.setBorder(new EmptyBorder(0, 0, 0, 0));
+        iconBadge.add(new JLabel(RoyalIcons.icon(vsCpu ? RoyalIcons.Glyph.CPU : RoyalIcons.Glyph.PLAYERS, 19, GOLD)));
+
+        String modeText = t("mode." + saved.options().mode())
+                + (vsCpu ? "  ·  " + t("level." + saved.options().level()) : "");
+        JLabel titleLbl = new JLabel(modeText);
+        titleLbl.setForeground(IVORY);
+        titleLbl.setFont(sans(Font.BOLD, 14.5f));
+        String meta = date(saved.updated()) + "  ·  " + t("halfMoves", saved.plies())
+                + (saved.outcome() == null ? "" : "  ·  " + t("reason." + saved.outcome().reason()));
+        JPanel info = stack(titleLbl, Box.createVerticalStrut(3), caption(meta));
+
+        JPanel right = transparent(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        right.add(outcomePill(saved.options(), saved.outcome()));
+        if (saved.outcome() == null) {
+            right.add(button(t("resume"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.PLAY, () -> openSaved(saved, true)));
+        }
+        right.add(button(t("replay"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HISTORY, () -> openSaved(saved, false)));
+        if (showExtraActions) {
+            right.add(new RoyalIconButton(RoyalIcons.Glyph.EXPORT, t("export"),
+                    () -> loadSaved(saved.id(), loaded -> exportSaved(loaded.snapshot(), loaded.session().game()))));
+            right.add(new RoyalIconButton(RoyalIcons.Glyph.ABOUT, t("details"), () -> details(saved)));
+        }
+
+        card.add(iconBadge, BorderLayout.WEST);
+        card.add(info, BorderLayout.CENTER);
+        card.add(right, BorderLayout.EAST);
+        return card;
+    }
+
+    private JLabel outcomePill(MatchOptions options, Outcome outcome) {
+        String labelText = resultLabel(options, outcome);
+        if (outcome == null) {
+            return pill(labelText, new Color(212, 175, 55, 32), new Color(212, 175, 55, 130), PALE);
+        }
+        if (outcome.winner() == null) {
+            return pill(labelText, new Color(150, 150, 165, 30), new Color(160, 160, 175, 110), new Color(0xD8D8E0));
+        }
+        boolean victory = options.mode() == MatchOptions.Mode.LOCAL || outcome.winner() == options.human();
+        if (victory) {
+            return pill(labelText, new Color(112, 227, 156, 26), new Color(112, 227, 156, 125), SUCCESS);
+        }
+        return pill(labelText, new Color(220, 75, 75, 30), new Color(220, 85, 85, 125), DANGER_TEXT);
+    }
+
     private JPanel cardLabel(String message) {
-        JPanel card = card(new BorderLayout());
-        card.add(label(message, MUTED));
+        RoyalCard card = new RoyalCard(new BorderLayout());
+        card.setBorder(new EmptyBorder(24, 22, 24, 22));
+        card.add(label(message, MUTED), BorderLayout.CENTER);
         return card;
     }
 
@@ -367,58 +504,289 @@ final class RoyalFrame extends JFrame {
         return ThemeManager.available(profile == null ? List.of() : profile.achievements());
     }
 
+    // =========================================================================
+    // NEW GAME SCREEN
+    // =========================================================================
+
     private void newGame(MatchOptions.Mode preferred) {
         JPanel page = padded();
-        page.add(heading(t("newGame"), null), BorderLayout.NORTH);
-        JPanel form = card(new GridBagLayout());
-        GridBagConstraints f = fieldConstraints();
-        var mode = combo(MatchOptions.Mode.values(), value -> t("mode." + value));
-        mode.setSelectedItem(preferred);
-        var color = combo(new String[]{"side.WHITE", "side.BLACK", "random"}, this::t);
-        var level = combo(MatchOptions.Level.values(), value -> t("level." + value));
-        level.setSelectedItem(MatchOptions.Level.MEDIUM);
+        page.add(heading(t("newGame"), t("newGameSubtitle"), null), BorderLayout.NORTH);
+
+        AtomicReference<MatchOptions.Mode> selectedMode = new AtomicReference<>(preferred);
+        AtomicReference<String> selectedSide = new AtomicReference<>("side.WHITE");
+        AtomicReference<MatchOptions.Level> selectedLevel = new AtomicReference<>(MatchOptions.Level.MEDIUM);
+        AtomicReference<String> selectedTheme = new AtomicReference<>(prefs.theme());
+
         var time = combo(new Integer[]{0, 1, 3, 5, 10, 15, 30, 60}, value -> value == 0 ? t("unlimited") : t("minutes", value));
         time.setSelectedItem(10);
         var increment = combo(new Integer[]{0, 1, 2, 3, 5, 10, 15, 30}, value -> t("seconds", value));
         increment.setSelectedItem(5);
-        var theme = combo(availableThemes(), id -> t("theme." + id));
-        theme.setSelectedItem(prefs.theme());
-        addInput(form, f, t("mode"), mode);
-        addInput(form, f, t("side"), color);
-        addInput(form, f, t("difficulty"), level);
-        addInput(form, f, t("timeControl"), time);
-        addInput(form, f, t("increment"), increment);
-        addInput(form, f, t("theme"), theme);
-        Runnable adjust = () -> {
-            boolean vsComputer = mode.getSelectedItem() == MatchOptions.Mode.COMPUTER;
-            level.setEnabled(vsComputer);
-            increment.setEnabled((Integer) time.getSelectedItem() != 0);
+
+        // Live summary labels
+        JLabel sumMode = label("", IVORY), sumSide = label("", IVORY), sumLevel = label("", IVORY),
+                sumClock = label("", PALE), sumTheme = label("", IVORY);
+
+        // Mode Cards
+        RoyalCard localCard = modeCard(t("mode.LOCAL"), t("modeLocalDesc"), RoyalIcons.Glyph.PLAYERS);
+        RoyalCard cpuCard = modeCard(t("mode.COMPUTER"), t("modeComputerDesc"), RoyalIcons.Glyph.CPU);
+
+        // Side segmented buttons
+        RoyalButton whiteBtn = new RoyalButton(t("side.WHITE"), RoyalButton.Variant.SEGMENT, null, null);
+        RoyalButton randomBtn = new RoyalButton(t("random"), RoyalButton.Variant.SEGMENT, RoyalIcons.Glyph.SPARK, null);
+        RoyalButton blackBtn = new RoyalButton(t("side.BLACK"), RoyalButton.Variant.SEGMENT, null, null);
+
+        // AI Level segmented buttons
+        RoyalButton[] levelButtons = new RoyalButton[MatchOptions.Level.values().length];
+        for (int i = 0; i < levelButtons.length; i++) {
+            MatchOptions.Level lvl = MatchOptions.Level.values()[i];
+            levelButtons[i] = new RoyalButton(t("level." + lvl), RoyalButton.Variant.SEGMENT, null, null);
+        }
+
+        // Time preset pills
+        record Preset(int min, int inc, String label) {}
+        List<Preset> presets = List.of(
+                new Preset(0, 0, t("unlimited")),
+                new Preset(3, 2, "3 + 2"),
+                new Preset(5, 3, "5 + 3"),
+                new Preset(10, 5, "10 + 5"),
+                new Preset(15, 10, "15 + 10"),
+                new Preset(30, 0, "30 + 0")
+        );
+        RoyalButton[] presetButtons = new RoyalButton[presets.size()];
+        for (int i = 0; i < presets.size(); i++) {
+            presetButtons[i] = new RoyalButton(presets.get(i).label(), RoyalButton.Variant.SEGMENT, null, null);
+            presetButtons[i].setBorder(new EmptyBorder(7, 10, 7, 10));
+        }
+
+        // Theme cards
+        String[] themes = availableThemes();
+        java.util.Map<String, RoyalCard> themeCards = new java.util.LinkedHashMap<>();
+
+        Runnable syncUi = () -> {
+            boolean vsCpu = selectedMode.get() == MatchOptions.Mode.COMPUTER;
+            localCard.setSelected(!vsCpu);
+            cpuCard.setSelected(vsCpu);
+
+            whiteBtn.setSelectedState(selectedSide.get().equals("side.WHITE"));
+            randomBtn.setSelectedState(selectedSide.get().equals("random"));
+            blackBtn.setSelectedState(selectedSide.get().equals("side.BLACK"));
+
+            for (int i = 0; i < levelButtons.length; i++) {
+                MatchOptions.Level lvl = MatchOptions.Level.values()[i];
+                levelButtons[i].setEnabled(vsCpu);
+                levelButtons[i].setSelectedState(vsCpu && selectedLevel.get() == lvl);
+            }
+
+            int mins = (Integer) time.getSelectedItem();
+            int inc = (Integer) increment.getSelectedItem();
+            increment.setEnabled(mins != 0);
+            for (int i = 0; i < presets.size(); i++) {
+                Preset p = presets.get(i);
+                presetButtons[i].setSelectedState(p.min() == mins && (mins == 0 || p.inc() == inc));
+            }
+            themeCards.forEach((id, card) -> card.setSelected(id.equals(selectedTheme.get())));
+
+            sumMode.setText(t("mode." + selectedMode.get()));
+            sumSide.setText(t(selectedSide.get()));
+            sumLevel.setText(vsCpu ? t("level." + selectedLevel.get()) : "—");
+            sumClock.setText(mins == 0 ? t("unlimited") : mins + " min  +" + inc + " s");
+            sumTheme.setText(t("theme." + selectedTheme.get()));
         };
-        mode.addActionListener(event -> adjust.run());
-        time.addActionListener(event -> adjust.run());
-        adjust.run();
-        addFieldRow(form, f, button(t("start"), true, () -> {
-            Side human = switch ((String) color.getSelectedItem()) {
+
+        localCard.interactive(() -> { selectedMode.set(MatchOptions.Mode.LOCAL); syncUi.run(); });
+        cpuCard.interactive(() -> { selectedMode.set(MatchOptions.Mode.COMPUTER); syncUi.run(); });
+        whiteBtn.addActionListener(e -> { selectedSide.set("side.WHITE"); syncUi.run(); });
+        randomBtn.addActionListener(e -> { selectedSide.set("random"); syncUi.run(); });
+        blackBtn.addActionListener(e -> { selectedSide.set("side.BLACK"); syncUi.run(); });
+        for (int i = 0; i < levelButtons.length; i++) {
+            MatchOptions.Level lvl = MatchOptions.Level.values()[i];
+            levelButtons[i].addActionListener(e -> { selectedLevel.set(lvl); syncUi.run(); });
+        }
+        for (int i = 0; i < presets.size(); i++) {
+            Preset p = presets.get(i);
+            presetButtons[i].addActionListener(e -> {
+                time.setSelectedItem(p.min());
+                increment.setSelectedItem(p.inc());
+                syncUi.run();
+            });
+        }
+        time.addActionListener(e -> syncUi.run());
+        increment.addActionListener(e -> syncUi.run());
+
+        // Left config column
+        JPanel leftCol = stack();
+
+        RoyalCard modeSection = new RoyalCard(new BorderLayout(0, 12));
+        modeSection.add(eyebrow(t("mode")), BorderLayout.NORTH);
+        JPanel modeRow = transparent(new GridLayout(1, 2, 12, 0));
+        modeRow.add(localCard);
+        modeRow.add(cpuCard);
+        modeSection.add(modeRow, BorderLayout.CENTER);
+        leftCol.add(modeSection);
+        gap(leftCol, 12);
+
+        RoyalCard sideAndAi = new RoyalCard(new GridLayout(2, 1, 0, 14));
+        JPanel sideBlock = transparent(new BorderLayout(0, 8));
+        sideBlock.add(eyebrow(t("side")), BorderLayout.NORTH);
+        JPanel sideBtns = transparent(new GridLayout(1, 3, 8, 0));
+        sideBtns.add(whiteBtn);
+        sideBtns.add(randomBtn);
+        sideBtns.add(blackBtn);
+        sideBlock.add(sideBtns, BorderLayout.CENTER);
+
+        JPanel aiBlock = transparent(new BorderLayout(0, 8));
+        aiBlock.add(eyebrow(t("difficulty")), BorderLayout.NORTH);
+        JPanel aiBtns = transparent(new GridLayout(1, 4, 8, 0));
+        for (RoyalButton b : levelButtons) aiBtns.add(b);
+        aiBlock.add(aiBtns, BorderLayout.CENTER);
+
+        sideAndAi.add(sideBlock);
+        sideAndAi.add(aiBlock);
+        leftCol.add(sideAndAi);
+        gap(leftCol, 12);
+
+        RoyalCard clockSection = new RoyalCard(new BorderLayout(0, 12));
+        clockSection.add(eyebrow(t("timeControl")), BorderLayout.NORTH);
+        JPanel presetGrid = transparent(new GridLayout(1, presets.size(), 6, 0));
+        for (RoyalButton pb : presetButtons) presetGrid.add(pb);
+        JPanel customRow = transparent(new GridLayout(1, 2, 12, 0));
+        customRow.add(labeledControl(t("timeControl"), time));
+        customRow.add(labeledControl(t("increment"), increment));
+        clockSection.add(stack(presetGrid, Box.createVerticalStrut(12), customRow), BorderLayout.CENTER);
+        leftCol.add(clockSection);
+        gap(leftCol, 12);
+
+        RoyalCard themeSection = new RoyalCard(new BorderLayout(0, 10));
+        themeSection.add(eyebrow(t("theme")), BorderLayout.NORTH);
+        JPanel themeRow = transparent(new GridLayout(1, Math.max(2, themes.length), 10, 0));
+        for (String id : themes) {
+            RoyalCard tc = themeSwatchCard(id, () -> { selectedTheme.set(id); syncUi.run(); });
+            themeCards.put(id, tc);
+            themeRow.add(tc);
+        }
+        themeSection.add(themeRow, BorderLayout.CENTER);
+        leftCol.add(themeSection);
+
+        // Right match summary & Start CTA card
+        RoyalCard summary = new RoyalCard(new BorderLayout(0, 16)).withGoldAccent();
+        summary.setPreferredSize(new Dimension(296, 440));
+        summary.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        RoyalArtwork preview = new RoyalArtwork(assets, true);
+        preview.setPreferredSize(new Dimension(250, 148));
+        JPanel summaryRows = stack(
+                eyebrow(t("matchSummary")),
+                Box.createVerticalStrut(8),
+                divider(),
+                Box.createVerticalStrut(12),
+                summaryPair(t("mode"), sumMode),
+                Box.createVerticalStrut(8),
+                summaryPair(t("side"), sumSide),
+                Box.createVerticalStrut(8),
+                summaryPair(t("difficulty"), sumLevel),
+                Box.createVerticalStrut(8),
+                summaryPair(t("timeControl"), sumClock),
+                Box.createVerticalStrut(8),
+                summaryPair(t("theme"), sumTheme));
+
+        RoyalButton startBtn = button(t("start"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.NEW_GAME, () -> {
+            Side human = switch (selectedSide.get()) {
                 case "side.BLACK" -> Side.BLACK;
                 case "random" -> ThreadLocalRandom.current().nextBoolean() ? Side.WHITE : Side.BLACK;
                 default -> Side.WHITE;
             };
             long base = (Integer) time.getSelectedItem() * 60_000L;
-            startMatch(new MatchOptions((MatchOptions.Mode) mode.getSelectedItem(), human,
-                    (MatchOptions.Level) level.getSelectedItem(), base,
-                    base == 0 ? 0 : (Integer) increment.getSelectedItem() * 1000L, (String) theme.getSelectedItem()));
-        }));
-        JPanel anchor = transparent(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        anchor.add(form);
-        page.add(scroll(anchor), BorderLayout.CENTER);
+            startMatch(new MatchOptions(selectedMode.get(), human, selectedLevel.get(), base,
+                    base == 0 ? 0 : (Integer) increment.getSelectedItem() * 1000L, selectedTheme.get()));
+        });
+        startBtn.setBorder(new EmptyBorder(12, 18, 12, 18));
+        startBtn.setFont(sans(Font.BOLD, 14.5f));
+
+        summary.add(preview, BorderLayout.NORTH);
+        summary.add(summaryRows, BorderLayout.CENTER);
+        summary.add(startBtn, BorderLayout.SOUTH);
+
+        JPanel rightWrap = transparent(new BorderLayout());
+        rightWrap.add(summary, BorderLayout.NORTH);
+
+        JPanel layout = transparent(new BorderLayout(18, 0));
+        JPanel leftWrap = transparent(new BorderLayout());
+        leftWrap.add(leftCol, BorderLayout.NORTH);
+        layout.add(leftWrap, BorderLayout.CENTER);
+        layout.add(rightWrap, BorderLayout.EAST);
+
+        syncUi.run();
+        page.add(scroll(layout), BorderLayout.CENTER);
         show(Page.NEW, page);
     }
+
+    private RoyalCard modeCard(String name, String desc, RoyalIcons.Glyph glyph) {
+        RoyalCard c = new RoyalCard(new BorderLayout(12, 0));
+        c.setBorder(new EmptyBorder(14, 14, 14, 14));
+        JLabel icon = new JLabel(RoyalIcons.icon(glyph, 22, GOLD));
+        JLabel title = new JLabel(name);
+        title.setForeground(IVORY);
+        title.setFont(sans(Font.BOLD, 14f));
+        c.add(icon, BorderLayout.WEST);
+        c.add(stack(title, Box.createVerticalStrut(2), caption(desc)), BorderLayout.CENTER);
+        return c;
+    }
+
+    private RoyalCard themeSwatchCard(String themeId, Runnable onSelect) {
+        RoyalCard card = new RoyalCard(new BorderLayout(12, 0)).interactive(onSelect);
+        card.setBorder(new EmptyBorder(11, 14, 11, 14));
+        card.setPreferredSize(new Dimension(200, 60));
+        JComponent swatch = new JComponent() {
+            { setPreferredSize(new Dimension(36, 36)); }
+            @Override protected void paintComponent(Graphics graphics) {
+                Graphics2D g = (Graphics2D) graphics.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean slate = ThemeManager.SLATE.equals(themeId);
+                g.setColor(slate ? new Color(0x9CB2BE) : new Color(0xDEC9A2));
+                g.fillRect(2, 2, 16, 16);
+                g.fillRect(18, 18, 16, 16);
+                g.setColor(slate ? new Color(0x233849) : new Color(0x221B15));
+                g.fillRect(18, 2, 16, 16);
+                g.fillRect(2, 18, 16, 16);
+                g.setColor(GOLD);
+                g.drawRect(1, 1, 33, 33);
+                g.dispose();
+            }
+        };
+        JLabel name = new JLabel(t("theme." + themeId));
+        name.setForeground(IVORY);
+        name.setFont(sans(Font.BOLD, 13.5f));
+        JPanel swWrap = transparent(new GridBagLayout());
+        swWrap.add(swatch);
+        card.add(swWrap, BorderLayout.WEST);
+        card.add(name, BorderLayout.CENTER);
+        return card;
+    }
+
+    private static JPanel labeledControl(String label, JComponent control) {
+        JPanel p = transparent(new BorderLayout(0, 5));
+        p.add(caption(label), BorderLayout.NORTH);
+        p.add(control, BorderLayout.CENTER);
+        return p;
+    }
+
+    private static JPanel summaryPair(String key, JLabel val) {
+        JPanel row = transparent(new BorderLayout(10, 0));
+        row.add(caption(key), BorderLayout.WEST);
+        val.setFont(sans(Font.BOLD, 13f));
+        row.add(val, BorderLayout.EAST);
+        return row;
+    }
+
+    // =========================================================================
+    // LIVE MATCH & RESULT SCREEN
+    // =========================================================================
 
     private void startMatch(MatchOptions options) { live(GameSession.start(user.id(), options, System::nanoTime)); }
 
     private void live(GameSession session) {
         MatchView live = new MatchView(this, session);
-        show(Page.NEW, live);
+        show(Page.NEW, live, true);
         match = live;
     }
 
@@ -439,27 +807,62 @@ final class RoyalFrame extends JFrame {
     private void resultPage(MatchSnapshot saved, Game game, Receipt receipt) {
         JPanel page = padded();
         page.add(heading(t("result"), null), BorderLayout.NORTH);
-        var banner = new RoyalArtwork(assets, true);
-        banner.setLayout(new BorderLayout());
-        JPanel result = stack(label(t("reason." + saved.outcome().reason()), PALE), Box.createVerticalStrut(8),
-                title(resultLabel(saved.options(), saved.outcome()), 54), Box.createVerticalStrut(17),
-                row(button(t("again"), true, () -> startMatch(saved.options())),
-                        button(t("analysis"), false, () -> openReplay(game, saved, true)),
-                        button(t("home"), false, this::dashboard)));
-        result.setBorder(new EmptyBorder(35, 26, 22, 24));
-        banner.add(result, BorderLayout.CENTER);
-        banner.setPreferredSize(new Dimension(750, 237));
-        JPanel metrics = transparent(new GridLayout(1, 3, 10, 0));
-        metrics.add(metric("gameTime", clock(saved.elapsedMillis())));
-        metrics.add(metric("moves", t("halfMoves", game.plyCount())));
-        metrics.add(metric("rating", receipt == null ? "—" : receipt.before() == receipt.after()
-                ? String.valueOf(receipt.after()) : receipt.before() + " → " + receipt.after()));
-        JPanel content = transparent(new BorderLayout(0, 15));
-        content.add(banner, BorderLayout.CENTER);
+
+        Outcome outcome = saved.outcome();
+        boolean isDraw = outcome.winner() == null;
+        boolean isVictory = !isDraw && (saved.options().mode() == MatchOptions.Mode.LOCAL || outcome.winner() == saved.options().human());
+        Color glow = isDraw ? new Color(180, 185, 200, 46)
+                : isVictory ? new Color(212, 175, 55, 62)
+                : new Color(210, 62, 58, 52);
+        Color accent = isDraw ? new Color(0xD8DCE4) : isVictory ? PALE : DANGER_TEXT;
+        RoyalIcons.Glyph badgeGlyph = isDraw ? RoyalIcons.Glyph.DRAW : isVictory ? RoyalIcons.Glyph.CROWN : RoyalIcons.Glyph.RESIGN;
+
+        RoyalBackgroundPanel hero = new RoyalBackgroundPanel(new BorderLayout(),
+                assets.brand(BrandingManager.DASHBOARD), 20, true, glow);
+        hero.setPreferredSize(new Dimension(780, 290));
+
+        JLabel reasonBadge = pill(t("reason." + outcome.reason()),
+                new Color(20, 18, 22, 200), new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 140), accent);
+        JLabel outcomeTitle = title(resultLabel(saved.options(), outcome), 54);
+        outcomeTitle.setForeground(accent);
+
+        JPanel badgeRow = row(new JLabel(RoyalIcons.icon(badgeGlyph, 28, accent)), reasonBadge);
+        JPanel actions = transparent(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        RoyalButton again = button(t("again"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.NEW_GAME,
+                () -> startMatch(saved.options()));
+        again.setBorder(new EmptyBorder(10, 20, 10, 20));
+        RoyalButton analysis = button(t("analysis"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.ANALYZE,
+                () -> openReplay(game, saved, true));
+        analysis.setBorder(new EmptyBorder(10, 18, 10, 18));
+        RoyalButton backHome = button(t("home"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HOME, this::dashboard);
+        backHome.setBorder(new EmptyBorder(10, 18, 10, 18));
+        actions.add(again);
+        actions.add(analysis);
+        actions.add(backHome);
+
+        JPanel heroText = stack(badgeRow, Box.createVerticalStrut(10), outcomeTitle, Box.createVerticalStrut(24), actions);
+        JPanel heroAnchor = transparent(new GridBagLayout());
+        heroAnchor.setBorder(new EmptyBorder(24, 36, 24, 24));
+        GridBagConstraints hc = new GridBagConstraints();
+        hc.anchor = GridBagConstraints.WEST;
+        heroAnchor.add(heroText, hc);
+        hero.add(heroAnchor, BorderLayout.WEST);
+
+        JPanel metrics = transparent(new GridLayout(1, 3, 14, 0));
+        metrics.add(metricCard("gameTime", clock(saved.elapsedMillis()), RoyalIcons.Glyph.CLOCK, IVORY, false));
+        metrics.add(metricCard("moves", t("halfMoves", game.plyCount()), RoyalIcons.Glyph.HISTORY, IVORY, false));
+        String ratingVal = receipt == null ? "—" : receipt.before() == receipt.after()
+                ? String.valueOf(receipt.after()) : receipt.before() + " → " + receipt.after();
+        metrics.add(metricCard("rating", ratingVal, RoyalIcons.Glyph.CROWN, PALE, true));
+
+        JPanel content = transparent(new BorderLayout(0, 18));
+        content.add(hero, BorderLayout.CENTER);
         content.add(metrics, BorderLayout.SOUTH);
         page.add(content, BorderLayout.CENTER);
-        if (receipt == null) page.add(button(t("save"), true, () ->
-                save(saved, updated -> resultPage(saved, game, updated), failure -> error("saveError", failure))), BorderLayout.SOUTH);
+        if (receipt == null) {
+            page.add(button(t("save"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.SAVE, () ->
+                    save(saved, updated -> resultPage(saved, game, updated), failure -> error("saveError", failure))), BorderLayout.SOUTH);
+        }
         show(Page.NEW, page);
     }
 
@@ -474,26 +877,34 @@ final class RoyalFrame extends JFrame {
         return DateTimeFormatter.ofPattern("dd MMM yyyy  HH:mm", text.locale()).withZone(ZoneId.systemDefault()).format(when);
     }
 
+    // =========================================================================
+    // GAME HISTORY SCREEN (PREMIUM CARD LIST)
+    // =========================================================================
+
     private void history() {
         long owner = user.id();
-        load(Page.HISTORY, "history", () -> store.history(owner), this::historyTable);
+        load(Page.HISTORY, "history", () -> store.history(owner), this::historyView);
     }
 
-    private void historyTable(List<ChessStore.Summary> data) {
+    private void historyView(List<ChessStore.Summary> data) {
         JPanel page = padded();
-        var search = field(false);
-        search.putClientProperty("JTextField.placeholderText", t("search"));
-        search.getAccessibleContext().setAccessibleName(t("search"));
+        page.add(heading(t("history"), t("historySubtitle"),
+                button(t("import"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.IMPORT, this::importPgn)), BorderLayout.NORTH);
+
+        RoyalTextField search = new RoyalTextField(t("search"), RoyalIcons.Glyph.SEARCH);
         var filter = combo(new String[]{"all", "inProgress", "victory", "defeat", "draw", "mode.LOCAL", "mode.COMPUTER"}, this::t);
-        page.add(heading(t("history"), row(button(t("import"), false, this::importPgn))), BorderLayout.NORTH);
-        JTable table = readonlyTable("date", "mode", "result", "moves");
-        var model = (DefaultTableModel) table.getModel();
-        List<ChessStore.Summary> visible = new java.util.ArrayList<>();
+
+        RoyalCard toolbar = new RoyalCard(new BorderLayout(12, 0));
+        toolbar.setBorder(new EmptyBorder(12, 16, 12, 16));
+        toolbar.add(search, BorderLayout.CENTER);
+        toolbar.add(filter, BorderLayout.EAST);
+
+        JPanel listPanel = stack();
         Runnable refresh = () -> {
-            model.setRowCount(0);
-            visible.clear();
+            listPanel.removeAll();
             String query = search.getText().strip().toLowerCase(text.locale());
             String chosen = (String) filter.getSelectedItem();
+            int count = 0;
             for (var game : data) {
                 String kind = t("mode." + game.options().mode());
                 String result = resultLabel(game.options(), game.outcome());
@@ -501,9 +912,15 @@ final class RoyalFrame extends JFrame {
                 String reason = game.outcome() == null ? "" : t("reason." + game.outcome().reason());
                 if (!chosen.equals("all") && !t(chosen).equals(kind) && !t(chosen).equals(result)) continue;
                 if (!(when + " " + kind + " " + result + " " + reason).toLowerCase(text.locale()).contains(query)) continue;
-                visible.add(game);
-                model.addRow(new Object[]{when, kind, result, game.plies()});
+                listPanel.add(gameSummaryCard(game, true));
+                gap(listPanel, 8);
+                count++;
             }
+            if (count == 0) {
+                listPanel.add(cardLabel(t("emptyHistory")));
+            }
+            listPanel.revalidate();
+            listPanel.repaint();
         };
         search.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { refresh.run(); }
@@ -511,43 +928,24 @@ final class RoyalFrame extends JFrame {
             @Override public void changedUpdate(DocumentEvent event) { refresh.run(); }
         });
         filter.addActionListener(event -> refresh.run());
-        Runnable select = () -> {
-            int row = table.getSelectedRow();
-            if (row >= 0) details(visible.get(row));
-        };
-        table.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) select.run(); }
-        });
-        JButton details = button(t("details"), false, select);
-        JButton resume = button(t("resume"), true, () -> openSaved(visible.get(table.getSelectedRow()), true));
-        JButton replayButton = button(t("replay"), false, () -> openSaved(visible.get(table.getSelectedRow()), false));
-        details.setEnabled(false);
-        resume.setEnabled(false);
-        replayButton.setEnabled(false);
-        table.getSelectionModel().addListSelectionListener(event -> {
-            int row = table.getSelectedRow();
-            boolean selected = row >= 0 && row < visible.size();
-            details.setEnabled(selected);
-            replayButton.setEnabled(selected);
-            resume.setEnabled(selected && visible.get(row).outcome() == null);
-        });
         refresh.run();
-        var wrapper = card(new BorderLayout(0, 10));
-        wrapper.add(row(search, filter), BorderLayout.NORTH);
-        wrapper.add(scroll(table), BorderLayout.CENTER);
-        wrapper.add(row(details, resume, replayButton), BorderLayout.SOUTH);
-        page.add(wrapper, BorderLayout.CENTER);
+
+        JPanel content = transparent(new BorderLayout(0, 14));
+        content.add(toolbar, BorderLayout.NORTH);
+        content.add(scroll(listPanel), BorderLayout.CENTER);
+        page.add(content, BorderLayout.CENTER);
         show(Page.HISTORY, page);
     }
 
     private void details(ChessStore.Summary item) {
-        String details = date(item.updated()) + "\n" + t("mode." + item.options().mode()) + "\n"
+        String info = date(item.updated()) + "\n" + t("mode." + item.options().mode()) + "\n"
                 + resultLabel(item.options(), item.outcome()) + "\n"
-                + (item.outcome() == null ? "" : t("reason." + item.outcome().reason()) + "\n") + t("halfMoves", item.plies());
-        Object[] actions = item.outcome() == null ? new Object[]{t("resume"), t("replay"), t("export"), t("cancel")}
-                : new Object[]{t("replay"), t("export"), t("cancel")};
-        Object choice = JOptionPane.showInputDialog(this, details, t("details"), JOptionPane.PLAIN_MESSAGE, null, actions, actions[0]);
-        if (choice == null || choice.equals(t("cancel"))) return;
+                + (item.outcome() == null ? "" : t("reason." + item.outcome().reason()) + "\n")
+                + t("halfMoves", item.plies());
+        List<String> actions = item.outcome() == null ? List.of(t("resume"), t("replay"), t("export"))
+                : List.of(t("replay"), t("export"));
+        String choice = RoyalDialog.choose(this, t("details"), info, actions, t("cancel"));
+        if (choice == null) return;
         if (choice.equals(t("export"))) loadSaved(item.id(), loaded -> exportSaved(loaded.snapshot(), loaded.session().game()));
         else openSaved(item, choice.equals(t("resume")));
     }
@@ -572,7 +970,7 @@ final class RoyalFrame extends JFrame {
         String white = playerName(saved.options(), Side.WHITE), black = playerName(saved.options(), Side.BLACK);
         ReplayView view = new ReplayView(this, game, saved.options().human(), saved.options().theme(), white, black,
                 this::history, () -> exportSaved(saved, game), end);
-        show(Page.HISTORY, view);
+        show(Page.HISTORY, view, true);
         replay = view;
     }
 
@@ -608,7 +1006,7 @@ final class RoyalFrame extends JFrame {
             var view = new ReplayView(this, imported.game(), Side.WHITE, prefs.theme(),
                     imported.tags().getOrDefault("White", t("side.WHITE")), imported.tags().getOrDefault("Black", t("side.BLACK")),
                     this::history, () -> exportPgn(result.raw()), false);
-            show(Page.HISTORY, view);
+            show(Page.HISTORY, view, true);
             replay = view;
         }, failure -> { if (token == generation) error("fileError", failure); });
     }
@@ -619,6 +1017,10 @@ final class RoyalFrame extends JFrame {
         return chooser;
     }
 
+    // =========================================================================
+    // PUZZLES & PUZZLE HISTORY
+    // =========================================================================
+
     void puzzles() { navigate(this::puzzleList); }
 
     private void puzzleList() {
@@ -626,33 +1028,87 @@ final class RoyalFrame extends JFrame {
         load(Page.PUZZLES, "puzzles", () -> store.profile(owner), data -> {
             profile = data;
             JPanel page = padded();
-            var filter = combo(new String[]{"all", "level.EASY", "level.MEDIUM", "level.HARD"}, this::t);
-            page.add(heading(t("puzzles"), row(filter, button(t("puzzleHistory"), false, this::puzzleHistory))), BorderLayout.NORTH);
-            JPanel list = stack();
+            AtomicReference<String> selectedFilter = new AtomicReference<>("all");
+
+            JLabel ptsPill = pill(t("points") + ": " + data.puzzlePoints(),
+                    new Color(212, 175, 55, 32), new Color(212, 175, 55, 130), PALE);
+            page.add(heading(t("puzzles"), t("puzzlesSubtitle"),
+                    row(ptsPill, button(t("puzzleHistory"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HISTORY, this::puzzleHistory))),
+                    BorderLayout.NORTH);
+
+            String[] filters = {"all", "level.EASY", "level.MEDIUM", "level.HARD"};
+            RoyalButton[] filterBtns = new RoyalButton[filters.length];
+            JPanel filterBar = transparent(new FlowLayout(FlowLayout.LEFT, 8, 0));
+            JPanel grid = transparent(new GridLayout(0, 2, 14, 14));
+
             Runnable draw = () -> {
-                list.removeAll();
-                for (Puzzles.Puzzle entry : Puzzles.catalog()) {
-                    if (!filter.getSelectedItem().equals("all") && !filter.getSelectedItem().equals("level." + entry.level())) continue;
-                    JPanel card = card(new BorderLayout(12, 0));
-                    card.add(stack(title(t("puzzle." + entry.id()), 22), label(t("level." + entry.level()) + "  ·  +" + entry.points(), PALE)),
-                            BorderLayout.CENTER);
-                    card.add(button(t("startPuzzle"), false, () -> openPuzzle(entry)), BorderLayout.EAST);
-                    list.add(card);
-                    gap(list, 10);
+                for (int i = 0; i < filters.length; i++) {
+                    filterBtns[i].setSelectedState(filters[i].equals(selectedFilter.get()));
                 }
-                list.revalidate();
-                list.repaint();
+                grid.removeAll();
+                for (Puzzles.Puzzle entry : Puzzles.catalog()) {
+                    if (!selectedFilter.get().equals("all") && !selectedFilter.get().equals("level." + entry.level())) continue;
+                    grid.add(puzzleCard(entry));
+                }
+                grid.revalidate();
+                grid.repaint();
             };
-            filter.addActionListener(event -> draw.run());
+
+            for (int i = 0; i < filters.length; i++) {
+                String key = filters[i];
+                filterBtns[i] = new RoyalButton(t(key), RoyalButton.Variant.SEGMENT, null, () -> {
+                    selectedFilter.set(key);
+                    draw.run();
+                });
+                filterBar.add(filterBtns[i]);
+            }
             draw.run();
-            page.add(scroll(list), BorderLayout.CENTER);
+
+            JPanel wrap = transparent(new BorderLayout(0, 14));
+            wrap.add(filterBar, BorderLayout.NORTH);
+            JPanel gridHolder = transparent(new BorderLayout());
+            gridHolder.add(grid, BorderLayout.NORTH);
+            wrap.add(scroll(gridHolder), BorderLayout.CENTER);
+            page.add(wrap, BorderLayout.CENTER);
             show(Page.PUZZLES, page);
         });
     }
 
+    private RoyalCard puzzleCard(Puzzles.Puzzle entry) {
+        RoyalCard card = new RoyalCard(new BorderLayout(0, 12)).withGoldAccent();
+        card.setBorder(new EmptyBorder(18, 20, 18, 20));
+        Side turn = entry.game().position().turn();
+
+        JPanel top = transparent(new BorderLayout(8, 0));
+        top.add(pill(t("level." + entry.level()), new Color(212, 175, 55, 28), new Color(212, 175, 55, 115), PALE), BorderLayout.WEST);
+        top.add(pill("+" + entry.points() + " pts", new Color(0x211E24), LINE_GOLD, IVORY), BorderLayout.EAST);
+
+        JPanel middle = transparent(new BorderLayout(12, 0));
+        JComponent pieceArt = new JComponent() {
+            { setPreferredSize(new Dimension(44, 52)); }
+            @Override protected void paintComponent(Graphics graphics) {
+                Graphics2D g = (Graphics2D) graphics.create();
+                assets.drawPieceFitted(g, Piece.of(turn, Kind.KNIGHT), 2, 2, getWidth() - 4, getHeight() - 4);
+                g.dispose();
+            }
+        };
+        middle.add(pieceArt, BorderLayout.WEST);
+        middle.add(stack(
+                title(t("puzzle." + entry.id()), 22),
+                Box.createVerticalStrut(4),
+                caption(t("mateOne") + "  ·  " + t("turn", t("side." + turn)))), BorderLayout.CENTER);
+
+        RoyalButton solveBtn = button(t("startPuzzle"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.PUZZLES,
+                () -> openPuzzle(entry));
+        card.add(top, BorderLayout.NORTH);
+        card.add(middle, BorderLayout.CENTER);
+        card.add(solveBtn, BorderLayout.SOUTH);
+        return card;
+    }
+
     void openPuzzle(Puzzles.Puzzle selected) {
         var view = new PuzzleView(this, selected);
-        show(Page.PUZZLES, view);
+        show(Page.PUZZLES, view, true);
         puzzle = view;
     }
 
@@ -667,27 +1123,87 @@ final class RoyalFrame extends JFrame {
         long owner = user.id();
         load(Page.PUZZLES, "puzzleHistory", () -> store.puzzleHistory(owner), attempts -> {
             JPanel page = padded();
-            page.add(heading(t("puzzleHistory"), button(t("back"), false, this::puzzleList)), BorderLayout.NORTH);
-            var table = readonlyTable("date", "puzzles", "result", "points");
-            var model = (DefaultTableModel) table.getModel();
-            for (var attempt : attempts) {
-                String result = t(attempt.solved() ? "puzzleSolved" : "puzzleMiss");
-                if (attempt.hinted()) result += " · " + t("puzzleHint");
-                model.addRow(new Object[]{date(attempt.date()), t("puzzle." + attempt.puzzleId()), result, attempt.points()});
+            page.add(heading(t("puzzleHistory"), null,
+                    button(t("back"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.PREV, this::puzzleList)), BorderLayout.NORTH);
+            JPanel list = stack();
+            if (attempts.isEmpty()) {
+                list.add(cardLabel(t("emptyPuzzleHistory")));
+            } else {
+                for (var attempt : attempts) {
+                    RoyalCard card = new RoyalCard(new BorderLayout(12, 0));
+                    card.setBorder(new EmptyBorder(13, 18, 13, 18));
+                    card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
+                    JLabel name = new JLabel(t("puzzle." + attempt.puzzleId()));
+                    name.setForeground(IVORY);
+                    name.setFont(sans(Font.BOLD, 14.5f));
+                    String sub = date(attempt.date()) + (attempt.hinted() ? "  ·  " + t("puzzleHint") : "");
+                    card.add(stack(name, Box.createVerticalStrut(2), caption(sub)), BorderLayout.CENTER);
+                    JPanel right = rowRight(
+                            pill(t(attempt.solved() ? "puzzleSolved" : "puzzleMiss"),
+                                    attempt.solved() ? new Color(112, 227, 156, 26) : new Color(220, 75, 75, 28),
+                                    attempt.solved() ? new Color(112, 227, 156, 125) : new Color(220, 85, 85, 125),
+                                    attempt.solved() ? SUCCESS : DANGER_TEXT),
+                            pill("+" + attempt.points(), new Color(0x211E24), LINE_GOLD, PALE));
+                    card.add(right, BorderLayout.EAST);
+                    list.add(card);
+                    gap(list, 8);
+                }
             }
-            page.add(attempts.isEmpty() ? cardLabel(t("emptyPuzzleHistory")) : scroll(table), BorderLayout.CENTER);
+            page.add(scroll(list), BorderLayout.CENTER);
             show(Page.PUZZLES, page);
         });
     }
 
+    // =========================================================================
+    // LEADERBOARD, STATISTICS & ACHIEVEMENTS
+    // =========================================================================
+
     private void leaderboard() {
         load(Page.LEADERBOARD, "leaderboard", store::leaderboard, players -> {
             JPanel page = padded();
-            page.add(heading(t("leaderboard"), null), BorderLayout.NORTH);
-            JTable table = readonlyTable("displayName", "rating", "wins", "played");
-            var model = (DefaultTableModel) table.getModel();
-            for (var player : players) model.addRow(new Object[]{player.user().displayName(), player.rating(), player.wins(), player.played()});
-            page.add(players.isEmpty() ? cardLabel(t("noProfiles")) : scroll(table), BorderLayout.CENTER);
+            page.add(heading(t("leaderboard"), t("leaderboardSubtitle"), null), BorderLayout.NORTH);
+            JPanel list = stack();
+            if (players.isEmpty()) {
+                list.add(cardLabel(t("noProfiles")));
+            } else {
+                int rank = 1;
+                for (var player : players) {
+                    RoyalCard card = new RoyalCard(new BorderLayout(16, 0));
+                    if (rank == 1) card.withGoldAccent();
+                    card.setBorder(new EmptyBorder(14, 18, 14, 18));
+                    card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 74));
+
+                    Color medalColor = rank == 1 ? GOLD : rank == 2 ? new Color(0xD2D6DE)
+                            : rank == 3 ? new Color(0xCD8C52) : MUTED;
+                    JLabel rankBadge = pill("#" + rank, new Color(0x201E24),
+                            new Color(medalColor.getRed(), medalColor.getGreen(), medalColor.getBlue(), 145), medalColor);
+                    rankBadge.setFont(mono(Font.BOLD, 14f));
+
+                    int rate = player.played() == 0 ? 0 : (int) Math.round(100d * player.wins() / player.played());
+                    JLabel name = new JLabel(player.user().displayName());
+                    name.setForeground(IVORY);
+                    name.setFont(sans(Font.BOLD, 15f));
+                    JLabel sub = caption(t("played") + ": " + player.played() + "  ·  " + t("wins") + ": " + player.wins()
+                            + "  ·  " + t("winRate") + ": " + rate + "%");
+
+                    JPanel scoreCol = transparent(new BorderLayout(0, 2));
+                    JLabel ratingVal = title(String.valueOf(player.rating()), 26);
+                    ratingVal.setForeground(rank <= 3 ? PALE : IVORY);
+                    ratingVal.setHorizontalAlignment(SwingConstants.RIGHT);
+                    JLabel ratingLbl = caption(t("rating"));
+                    ratingLbl.setHorizontalAlignment(SwingConstants.RIGHT);
+                    scoreCol.add(ratingVal, BorderLayout.NORTH);
+                    scoreCol.add(ratingLbl, BorderLayout.SOUTH);
+
+                    card.add(rankBadge, BorderLayout.WEST);
+                    card.add(stack(name, Box.createVerticalStrut(3), sub), BorderLayout.CENTER);
+                    card.add(scoreCol, BorderLayout.EAST);
+                    list.add(card);
+                    gap(list, 8);
+                    rank++;
+                }
+            }
+            page.add(scroll(list), BorderLayout.CENTER);
             show(Page.LEADERBOARD, page);
         });
     }
@@ -697,12 +1213,68 @@ final class RoyalFrame extends JFrame {
         load(Page.STATISTICS, "statistics", () -> store.profile(owner), player -> {
             profile = player;
             JPanel page = padded();
-            page.add(heading(t("statistics"), null), BorderLayout.NORTH);
+            page.add(heading(t("statistics"), t("statsOverview"), null), BorderLayout.NORTH);
             JPanel metrics = metricGrid(player, true);
-            var container = stack(metrics);
+
+            // Visual W/D/L Outcome Breakdown Card
+            RoyalCard breakdown = new RoyalCard(new BorderLayout(0, 12)).withGoldAccent();
+            breakdown.setBorder(new EmptyBorder(18, 20, 18, 20));
+            breakdown.setMaximumSize(new Dimension(Integer.MAX_VALUE, 138));
+            breakdown.add(eyebrow(t("statsBreakdown")), BorderLayout.NORTH);
+
+            int total = Math.max(0, player.wins() + player.draws() + player.losses());
+            JComponent bar = new JComponent() {
+                { setPreferredSize(new Dimension(400, 22)); }
+                @Override protected void paintComponent(Graphics graphics) {
+                    Graphics2D g = (Graphics2D) graphics.create();
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    int w = getWidth(), h = 14, y = (getHeight() - h) / 2;
+                    g.setColor(new Color(0x211F25));
+                    g.fillRoundRect(0, y, w, h, h, h);
+                    if (total > 0) {
+                        int ww = (int) Math.round(w * (double) player.wins() / total);
+                        int dw = (int) Math.round(w * (double) player.draws() / total);
+                        int lw = w - ww - dw;
+                        Shape old = g.getClip();
+                        g.setClip(new java.awt.geom.RoundRectangle2D.Double(0, y, w, h, h, h));
+                        g.setColor(SUCCESS); g.fillRect(0, y, ww, h);
+                        g.setColor(new Color(0x9BA3B4)); g.fillRect(ww, y, dw, h);
+                        g.setColor(DANGER_TEXT); g.fillRect(ww + dw, y, lw, h);
+                        g.setClip(old);
+                    }
+                    g.setColor(LINE);
+                    g.drawRoundRect(0, y, w - 1, h - 1, h, h);
+                    g.dispose();
+                }
+            };
+            JPanel legend = row(
+                    legendDot(SUCCESS, t("wins") + ": " + player.wins()),
+                    legendDot(new Color(0x9BA3B4), t("draws") + ": " + player.draws()),
+                    legendDot(DANGER_TEXT, t("losses") + ": " + player.losses()));
+            breakdown.add(bar, BorderLayout.CENTER);
+            breakdown.add(legend, BorderLayout.SOUTH);
+
+            JPanel container = stack(metrics, Box.createVerticalStrut(18), breakdown);
             page.add(scroll(container), BorderLayout.CENTER);
             show(Page.STATISTICS, page);
         });
+    }
+
+    private static JPanel legendDot(Color color, String text) {
+        JPanel p = transparent(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JComponent dot = new JComponent() {
+            { setPreferredSize(new Dimension(10, 10)); }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.fillOval(0, 0, 10, 10);
+                g2.dispose();
+            }
+        };
+        p.add(dot);
+        p.add(caption(text));
+        return p;
     }
 
     private void achievements() {
@@ -710,20 +1282,57 @@ final class RoyalFrame extends JFrame {
         load(Page.ACHIEVEMENTS, "achievements", () -> store.profile(owner), player -> {
             profile = player;
             JPanel page = padded();
-            page.add(heading(t("achievements"), null), BorderLayout.NORTH);
-            var list = stack();
-            if (player.achievements().isEmpty()) list.add(cardLabel(t("noAchievements")));
-            for (String badge : player.achievements()) {
-                JPanel card = card(new BorderLayout());
-                card.add(title(t("achievement." + badge), 22), BorderLayout.CENTER);
-                if (badge.equals("puzzle-master")) card.add(label(t("theme.royal-slate"), PALE), BorderLayout.EAST);
-                list.add(card);
-                gap(list, 8);
+            int unlockedCount = player.achievements().size();
+            page.add(heading(t("achievements"), t("achievementsSubtitle"),
+                    pill(unlockedCount + " / " + ALL_ACHIEVEMENTS.size() + "  " + t("unlocked"),
+                            new Color(212, 175, 55, 32), new Color(212, 175, 55, 130), PALE)), BorderLayout.NORTH);
+
+            JPanel grid = transparent(new GridLayout(0, 2, 14, 14));
+            for (String badge : ALL_ACHIEVEMENTS) {
+                boolean earned = player.achievements().contains(badge);
+                RoyalCard card = new RoyalCard(new BorderLayout(14, 0));
+                if (earned) card.withGoldAccent();
+                card.setBorder(new EmptyBorder(16, 18, 16, 18));
+
+                RoyalPanel emblem = new RoyalPanel(new GridBagLayout(),
+                        earned ? new Color(0x2F2616) : new Color(0x18171B),
+                        earned ? new Color(0x1B160D) : new Color(0x121115),
+                        earned ? GOLD : LINE, 12);
+                emblem.setPreferredSize(new Dimension(48, 48));
+                emblem.setBorder(new EmptyBorder(0, 0, 0, 0));
+                emblem.add(new JLabel(RoyalIcons.icon(earned ? RoyalIcons.Glyph.TROPHY : RoyalIcons.Glyph.LOCK,
+                        22, earned ? GOLD : new Color(0x5B554C))));
+
+                JLabel titleLbl = title(t("achievement." + badge), 19);
+                titleLbl.setForeground(earned ? IVORY : new Color(0x8C867C));
+                JLabel desc = caption(t("achievementDesc." + badge));
+                JPanel rightCol = transparent(new BorderLayout());
+                JLabel statePill = earned
+                        ? pill(t("unlocked"), new Color(212, 175, 55, 34), new Color(212, 175, 55, 130), PALE)
+                        : pill(t("locked"), new Color(0x1D1C20), LINE, MUTED);
+                rightCol.add(statePill, BorderLayout.NORTH);
+                if (badge.equals("puzzle-master")) {
+                    JLabel reward = caption(t("theme.royal-slate"));
+                    reward.setForeground(earned ? PALE : MUTED);
+                    rightCol.add(reward, BorderLayout.SOUTH);
+                }
+
+                card.add(emblem, BorderLayout.WEST);
+                card.add(stack(titleLbl, Box.createVerticalStrut(4), desc), BorderLayout.CENTER);
+                card.add(rightCol, BorderLayout.EAST);
+                grid.add(card);
             }
-            page.add(scroll(list), BorderLayout.CENTER);
+
+            JPanel holder = transparent(new BorderLayout());
+            holder.add(grid, BorderLayout.NORTH);
+            page.add(scroll(holder), BorderLayout.CENTER);
             show(Page.ACHIEVEMENTS, page);
         });
     }
+
+    // =========================================================================
+    // SETTINGS SCREEN
+    // =========================================================================
 
     private void settings() {
         long owner = user.id();
@@ -735,39 +1344,73 @@ final class RoyalFrame extends JFrame {
 
     private void settingsForm() {
         JPanel page = padded();
-        page.add(heading(t("settings"), null), BorderLayout.NORTH);
-        JPanel form = card(new GridBagLayout());
-        GridBagConstraints f = fieldConstraints();
+        page.add(heading(t("settings"), t("settingsSubtitle"), null), BorderLayout.NORTH);
+
         JComboBox<String> language = combo(new String[]{"en", "vi"}, code -> t(code.equals("en") ? "english" : "vietnamese"));
         JComboBox<String> theme = combo(availableThemes(), id -> t("theme." + id));
         JComboBox<Preferences.Orientation> orientation = combo(Preferences.Orientation.values(), value -> t("orientation." + value));
-        JCheckBox sound = new JCheckBox(t("sound")), animation = new JCheckBox(t("animation")),
-                quality = new JCheckBox(t("quality")), autosave = new JCheckBox(t("autosave"));
-        var scale = new JSpinner(new SpinnerNumberModel(prefs.pieceScale(), 70, 105, 1));
-        Runnable read = () -> {
-            language.setSelectedItem(prefs.language());
-            theme.setSelectedItem(prefs.theme());
-            orientation.setSelectedItem(prefs.orientation());
-            sound.setSelected(prefs.sound());
-            animation.setSelected(prefs.animation());
-            quality.setSelected(prefs.highQuality());
-            autosave.setSelected(prefs.autosave());
-            scale.setValue(prefs.pieceScale());
-        };
-        read.run();
-        addInput(form, f, t("language"), language);
-        addInput(form, f, t("theme"), theme);
-        addInput(form, f, t("orientation"), orientation);
-        addInput(form, f, t("scale"), scale);
-        for (var checkbox : new JCheckBox[]{sound, animation, quality, autosave}) addFieldRow(form, f, checkbox);
-        addFieldRow(form, f, row(button(t("apply"), true, () -> savePrefs(new Preferences((String) language.getSelectedItem(),
+        RoyalToggle sound = new RoyalToggle(t("sound"), prefs.sound());
+        RoyalToggle animation = new RoyalToggle(t("animation"), prefs.animation());
+        RoyalToggle quality = new RoyalToggle(t("quality"), prefs.highQuality());
+        RoyalToggle autosave = new RoyalToggle(t("autosave"), prefs.autosave());
+
+        JSlider scaleSlider = new JSlider(70, 105, prefs.pieceScale());
+        scaleSlider.setOpaque(false);
+        JLabel scaleReadout = pill(prefs.pieceScale() + "%", new Color(212, 175, 55, 30), new Color(212, 175, 55, 120), PALE);
+        scaleSlider.addChangeListener(e -> scaleReadout.setText(scaleSlider.getValue() + "%"));
+
+        language.setSelectedItem(prefs.language());
+        theme.setSelectedItem(prefs.theme());
+        orientation.setSelectedItem(prefs.orientation());
+
+        // Section 1: Board & Visuals
+        RoyalCard appearance = new RoyalCard(new BorderLayout(0, 14)).withGoldAccent();
+        appearance.setBorder(new EmptyBorder(18, 22, 20, 22));
+        appearance.add(stack(eyebrow(t("settingsAppearance")), Box.createVerticalStrut(6), divider()), BorderLayout.NORTH);
+        JPanel visualGrid = transparent(new GridLayout(0, 2, 18, 14));
+        visualGrid.add(labeledControl(t("language"), language));
+        visualGrid.add(labeledControl(t("theme"), theme));
+        visualGrid.add(labeledControl(t("orientation"), orientation));
+        JPanel scaleBox = transparent(new BorderLayout(10, 0));
+        scaleBox.add(scaleSlider, BorderLayout.CENTER);
+        JPanel scalePillWrap = transparent(new GridBagLayout());
+        scalePillWrap.add(scaleReadout);
+        scaleBox.add(scalePillWrap, BorderLayout.EAST);
+        visualGrid.add(labeledControl(t("scale"), scaleBox));
+        appearance.add(visualGrid, BorderLayout.CENTER);
+        JPanel qualityRow = transparent(new FlowLayout(FlowLayout.LEFT, 0, 4));
+        qualityRow.add(quality);
+        appearance.add(qualityRow, BorderLayout.SOUTH);
+
+        // Section 2: Gameplay & Behavior
+        RoyalCard gameplay = new RoyalCard(new BorderLayout(0, 14));
+        gameplay.setBorder(new EmptyBorder(18, 22, 20, 22));
+        gameplay.add(stack(eyebrow(t("settingsGameplay")), Box.createVerticalStrut(6), divider()), BorderLayout.NORTH);
+        JPanel toggles = transparent(new GridLayout(0, 1, 0, 12));
+        toggles.add(sound);
+        toggles.add(animation);
+        toggles.add(autosave);
+        gameplay.add(toggles, BorderLayout.CENTER);
+
+        // Action Bar
+        JPanel actions = transparent(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        RoyalButton applyBtn = button(t("apply"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.CHECK, () ->
+                savePrefs(new Preferences((String) language.getSelectedItem(),
                         (String) theme.getSelectedItem(), sound.isSelected(), animation.isSelected(),
-                        (Preferences.Orientation) orientation.getSelectedItem(), (Integer) scale.getValue(),
-                        quality.isSelected(), autosave.isSelected()))),
-                button(t("reset"), false, () -> savePrefs(Preferences.defaults(authLanguage)))));
-        JPanel anchor = transparent(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        anchor.add(form);
-        page.add(scroll(anchor), BorderLayout.CENTER);
+                        (Preferences.Orientation) orientation.getSelectedItem(), scaleSlider.getValue(),
+                        quality.isSelected(), autosave.isSelected())));
+        applyBtn.setBorder(new EmptyBorder(10, 22, 10, 22));
+        RoyalButton resetBtn = button(t("reset"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO,
+                () -> savePrefs(Preferences.defaults(authLanguage)));
+        resetBtn.setBorder(new EmptyBorder(10, 18, 10, 18));
+        actions.add(applyBtn);
+        actions.add(resetBtn);
+
+        JPanel sections = stack(appearance, Box.createVerticalStrut(14), gameplay, Box.createVerticalStrut(16), actions);
+        sections.setMaximumSize(new Dimension(860, Integer.MAX_VALUE));
+        JPanel container = transparent(new BorderLayout());
+        container.add(sections, BorderLayout.NORTH);
+        page.add(scroll(container), BorderLayout.CENTER);
         show(Page.SETTINGS, page);
     }
 
@@ -783,18 +1426,9 @@ final class RoyalFrame extends JFrame {
         }, failure -> { if (generation == token) error("storeError", failure); });
     }
 
-    private JTable readonlyTable(String... keys) {
-        String[] headers = java.util.Arrays.stream(keys).map(this::t).toArray(String[]::new);
-        JTable table = new JTable(new DefaultTableModel(headers, 0) {
-            @Override public boolean isCellEditable(int row, int column) { return false; }
-        });
-        table.setRowHeight(34);
-        table.setShowGrid(false);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setFillsViewportHeight(true);
-        table.getTableHeader().setReorderingAllowed(false);
-        return table;
-    }
+    // =========================================================================
+    // FORM HELPERS & DIALOGS
+    // =========================================================================
 
     private static GridBagConstraints fieldConstraints() {
         GridBagConstraints f = new GridBagConstraints();
@@ -820,26 +1454,16 @@ final class RoyalFrame extends JFrame {
     }
 
     boolean confirm(String key) {
-        return JOptionPane.showOptionDialog(this, t(key), getTitle(), JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, new Object[]{t("confirm"), t("cancel")}, t("cancel")) == 0;
+        return RoyalDialog.confirm(this, getTitle(), t(key), t("confirm"), t("cancel"), false);
     }
 
     void error(String key, Throwable failure) {
         LoggerFactory.getLogger(RoyalFrame.class).error(key, failure);
-        JOptionPane.showMessageDialog(this, t(key), t("error"), JOptionPane.ERROR_MESSAGE);
+        RoyalDialog.message(this, t("error"), t(key), t("close"), true);
     }
 
     private void about() {
-        JPanel info = stack(
-                branding.logo(BrandingManager.GAME, 330, 187, BrandConstants.PRODUCT),
-                branding.logo(BrandingManager.EMBLEM, 92, 59, BrandConstants.COMPANY),
-                Box.createVerticalStrut(8),
-                title(BrandConstants.PRODUCT, 24),
-                label(t("version", BrandConstants.version()), PALE),
-                label(t("developed", BrandConstants.COMPANY, BrandConstants.COMPANY_CHINESE), IVORY),
-                label(BrandConstants.COPYRIGHT, MUTED),
-                label(t(engines.stockfishDetected() ? "stockfishDetected" : "stockfishInternal"), MUTED));
-        JOptionPane.showMessageDialog(this, info, t("about"), JOptionPane.PLAIN_MESSAGE);
+        RoyalDialog.about(this, branding, text, engines.stockfishDetected());
     }
 
     void toggleFullscreen() {
@@ -865,14 +1489,45 @@ final class RoyalFrame extends JFrame {
         dispose();
     }
 
-    // The visual smoke path drives the same frame, views and page methods as the desktop.
+    // =========================================================================
+    // VISUAL QA / SMOKE HOOKS (DRIVES THE REAL UI SCREENS)
+    // =========================================================================
+
     void visualGuest() { enter(new LoginData(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"), prefs)); }
+
     void visualMatch() {
         var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.LOCAL, Side.WHITE,
                 MatchOptions.Level.MEDIUM, 600_000, 5000, "royal"), System::nanoTime);
         game.resume();
-        for (String move : "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6".split(" ")) game.play(Move.uci(move));
+        for (String move : "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 d7c6".split(" ")) game.play(Move.uci(move));
         game.pause();
         live(game);
+    }
+
+    void visualNewGame() { newGame(MatchOptions.Mode.COMPUTER); }
+    void visualPuzzles() { puzzleList(); }
+    void visualPuzzlePlay() { openPuzzle(Puzzles.catalog().get(0)); }
+    void visualHistory() { history(); }
+    void visualLeaderboard() { leaderboard(); }
+    void visualStatistics() { statistics(); }
+    void visualAchievements() { achievements(); }
+    void visualSettings() { settings(); }
+
+    void visualResult() {
+        var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
+                MatchOptions.Level.HARD, 600_000, 5000, "royal"), System::nanoTime);
+        game.resume();
+        for (String move : "f2f3 e7e5 g2g4 d8h4".split(" ")) game.play(Move.uci(move));
+        // Build a victory sample using Scholar's mate for visual verification
+        var winGame = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
+                MatchOptions.Level.MEDIUM, 600_000, 5000, "royal"), System::nanoTime);
+        winGame.resume();
+        for (String move : "e2e4 e7e5 f1c4 b8c6 d1h5 g8f6 h5f7".split(" ")) winGame.play(Move.uci(move));
+        winGame.pause();
+        resultPage(winGame.snapshot(), winGame.game(), new Receipt(1200, 1224));
+    }
+
+    JDialog visualAboutDialog() {
+        return RoyalDialog.createAboutDialog(this, branding, text, engines.stockfishDetected());
     }
 }

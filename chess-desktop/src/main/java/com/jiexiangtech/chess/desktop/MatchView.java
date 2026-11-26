@@ -19,70 +19,119 @@ final class MatchView extends JPanel {
     private final I18n text;
     private final Preferences prefs;
     private final ChessBoardPanel board;
-    private final Moves moves;
-    private final Captures captures;
-    private final JTable table;
-    private final JLabel status = label(" ", PALE), saveStatus = label(" ", MUTED);
-    private final JLabel whiteClock = title("—", 26), blackClock = title("—", 26);
-    private final JPanel whiteCard, blackCard, boardArea, side;
-    private final JButton undo, hint, resign, draw, sound;
+    private final RoyalMoveHistory moveHistory;
+    private final RoyalCapturedTray captures;
+    private final JLabel statusPill;
+    private final JLabel saveStatus = caption(" ");
+    private final RoyalPlayerCard whiteCard, blackCard;
+    private final JPanel boardArea;
+    private final RoyalButton saveBtn, undo, hint, resign, draw, sound, flipBtn, fullscreenBtn, pauseBtn;
     private final Timer tick;
-    private boolean active = true, soundEnabled, leaving, endDisplayed;
+    private boolean active = true, soundEnabled, leaving, endDisplayed, flipped;
     private SwingWorker<ChessEngine.Analysis, Void> search;
     private int saveSequence;
 
     MatchView(RoyalFrame frame, GameSession session) {
-        super(new BorderLayout(12, 0));
+        super(new BorderLayout(16, 0));
         this.frame = frame;
         this.session = session;
         this.text = frame.text();
         this.prefs = frame.prefs();
         this.soundEnabled = prefs.sound();
         setOpaque(false);
-        setBorder(new EmptyBorder(12, 10, 12, 14));
+        setBorder(new EmptyBorder(12, 16, 12, 18));
+
         board = new ChessBoardPanel(frame.assets(), prefs, session.options().theme(), this::canPlay,
-                options -> promote(this, text), this::play);
+                options -> promote(this, frame.assets(), text, session.game().position().turn()), this::play);
         flipped = flip(prefs, session.options().human());
         board.setFlipped(flipped);
-        boardArea = transparent(new BorderLayout(0, 3));
-        whiteCard = player(Side.WHITE, whiteClock);
-        blackCard = player(Side.BLACK, blackClock);
+
+        // Player info cards anchored closely to the board stage
+        whiteCard = new RoyalPlayerCard(frame.assets(), Side.WHITE,
+                frame.playerName(session.options(), Side.WHITE), text.get("side.WHITE"), text.get("activeTurn"));
+        blackCard = new RoyalPlayerCard(frame.assets(), Side.BLACK,
+                frame.playerName(session.options(), Side.BLACK), text.get("side.BLACK"), text.get("activeTurn"));
+
+        boardArea = transparent(new BorderLayout(0, 6));
         placePlayers();
         boardArea.add(board, BorderLayout.CENTER);
         add(boardArea, BorderLayout.CENTER);
 
-        moves = new Moves(text);
-        table = moves.table();
-        captures = new Captures(frame.assets(), text);
-        side = card(new BorderLayout(0, 12));
-        side.setPreferredSize(new Dimension(276, 440));
-        side.setBorder(new EmptyBorder(15, 13, 15, 13));
-        JPanel overview = stack(title(text.get("game"), 23), Box.createVerticalStrut(7), status);
+        // Right cohesive luxury command panel
+        RoyalPanel side = new RoyalPanel(new BorderLayout(0, 12), new Color(0x19171D), new Color(0x121115), LINE, 16);
+        side.setPreferredSize(new Dimension(304, 520));
+        side.setMinimumSize(new Dimension(276, 420));
+        side.setBorder(new EmptyBorder(16, 16, 14, 16));
+
+        // Top match header & status pill
+        statusPill = pill(text.get("turn", text.get("side.WHITE")),
+                new Color(212, 175, 55, 34), new Color(212, 175, 55, 130), PALE);
+        JPanel titleRow = transparent(new BorderLayout(8, 0));
+        titleRow.add(title(text.get("game"), 22), BorderLayout.WEST);
+        titleRow.add(statusPill, BorderLayout.EAST);
+        JPanel overview = stack(
+                eyebrow(text.get("mode." + session.options().mode())),
+                Box.createVerticalStrut(4),
+                titleRow,
+                Box.createVerticalStrut(10),
+                divider());
         side.add(overview, BorderLayout.NORTH);
-        JPanel log = transparent(new BorderLayout(0, 8));
-        log.add(label(text.get("moves"), PALE), BorderLayout.NORTH);
-        log.add(scroll(table), BorderLayout.CENTER);
-        log.add(stack(label(text.get("capture"), MUTED), captures), BorderLayout.SOUTH);
-        side.add(log, BorderLayout.CENTER);
-        JPanel actions = transparent(new GridLayout(0, 2, 5, 5));
-        undo = button(text.get("undo"), false, this::undo);
-        hint = button(text.get("hint"), false, this::hint);
-        resign = button(text.get("resign"), false, this::resign);
-        draw = button(text.get("draw"), false, this::draw);
-        sound = button(text.get(soundEnabled ? "soundOn" : "soundOff"), false, this::sound);
-        actions.add(button(text.get("save"), true, () -> { if (!leaving) persist(true, null); }));
-        actions.add(undo);
-        actions.add(hint);
-        actions.add(draw);
-        actions.add(resign);
-        actions.add(button(text.get("flip"), false, this::flipBoard));
-        actions.add(sound);
-        actions.add(button(text.get("fullscreen"), false, frame::toggleFullscreen));
+
+        // Center: custom move history + captured pieces tray
+        moveHistory = new RoyalMoveHistory(text, null);
+        captures = new RoyalCapturedTray(frame.assets(), text);
+
+        JPanel movesHeader = transparent(new BorderLayout());
+        movesHeader.add(eyebrow(text.get("moves")), BorderLayout.WEST);
+        JPanel movesSection = transparent(new BorderLayout(0, 6));
+        movesSection.add(movesHeader, BorderLayout.NORTH);
+        movesSection.add(moveHistory, BorderLayout.CENTER);
+
+        JPanel capturedSection = transparent(new BorderLayout(0, 6));
+        capturedSection.setBorder(new EmptyBorder(8, 0, 0, 0));
+        capturedSection.add(eyebrow(text.get("capture")), BorderLayout.NORTH);
+        capturedSection.add(captures, BorderLayout.CENTER);
+
+        JPanel centerStack = transparent(new BorderLayout(0, 4));
+        centerStack.add(movesSection, BorderLayout.CENTER);
+        centerStack.add(capturedSection, BorderLayout.SOUTH);
+        side.add(centerStack, BorderLayout.CENTER);
+
+        // South: hierarchical action buttons
+        saveBtn = compactAction(text.get("save"), RoyalButton.Variant.PRIMARY, RoyalIcons.Glyph.SAVE, () -> {
+            if (!leaving) persist(true, null);
+        });
+        undo = compactAction(text.get("undo"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.UNDO, this::undo);
+        hint = compactAction(text.get("hint"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.HINT, this::hint);
+        draw = compactAction(text.get("draw"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.DRAW, this::draw);
+        flipBtn = compactAction(text.get("flip"), RoyalButton.Variant.SECONDARY, RoyalIcons.Glyph.FLIP, this::flipBoard);
+        sound = compactAction(text.get(soundEnabled ? "soundOn" : "soundOff"), RoyalButton.Variant.SECONDARY,
+                soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF, this::sound);
+        fullscreenBtn = compactAction(text.get("fullscreen"), RoyalButton.Variant.SECONDARY,
+                RoyalIcons.Glyph.FULLSCREEN, frame::toggleFullscreen);
+        resign = compactAction(text.get("resign"), RoyalButton.Variant.DANGER, RoyalIcons.Glyph.RESIGN, this::resign);
+        pauseBtn = compactAction(text.get("pause"), RoyalButton.Variant.GHOST, RoyalIcons.Glyph.PAUSE, frame::home);
+
+        JPanel actionGrid = transparent(new GridLayout(4, 2, 7, 7));
+        actionGrid.add(saveBtn);
+        actionGrid.add(undo);
+        actionGrid.add(hint);
+        actionGrid.add(draw);
+        actionGrid.add(flipBtn);
+        actionGrid.add(sound);
+        actionGrid.add(fullscreenBtn);
+        actionGrid.add(resign);
+
         JPanel lower = transparent(new BorderLayout(0, 7));
-        lower.add(saveStatus, BorderLayout.NORTH);
-        lower.add(actions, BorderLayout.CENTER);
-        lower.add(button(text.get("pause"), false, frame::home), BorderLayout.SOUTH);
+        JPanel statusLine = transparent(new BorderLayout());
+        statusLine.add(divider(), BorderLayout.NORTH);
+        saveStatus.setBorder(new EmptyBorder(6, 2, 0, 2));
+        statusLine.add(saveStatus, BorderLayout.SOUTH);
+        lower.add(statusLine, BorderLayout.NORTH);
+        lower.add(actionGrid, BorderLayout.CENTER);
+        lower.add(pauseBtn, BorderLayout.SOUTH);
         side.add(lower, BorderLayout.SOUTH);
+
         add(side, BorderLayout.EAST);
 
         tick = new Timer(100, event -> onTick());
@@ -94,20 +143,16 @@ final class MatchView extends JPanel {
         computer();
     }
 
-    GameSession session() { return session; }
-
-    private JPanel player(Side color, JLabel clock) {
-        JPanel card = card(new BorderLayout(10, 0));
-        card.setBorder(new EmptyBorder(7, 13, 7, 13));
-        var marker = label("●", color == Side.WHITE ? IVORY : GOLD);
-        card.add(marker, BorderLayout.WEST);
-        card.add(stack(label(frame.playerName(session.options(), color), IVORY),
-                label(text.get("side." + color), MUTED)), BorderLayout.CENTER);
-        card.add(clock, BorderLayout.EAST);
-        return card;
+    private static RoyalButton compactAction(String label, RoyalButton.Variant variant, RoyalIcons.Glyph glyph, Runnable action) {
+        RoyalButton btn = new RoyalButton(label, variant, glyph, action);
+        btn.setBorder(new EmptyBorder(7, 10, 7, 10));
+        btn.setFont(sans(Font.BOLD, 12.5f));
+        btn.setMinimumSize(new Dimension(42, 34));
+        return btn;
     }
 
-    private boolean flipped;
+    GameSession session() { return session; }
+
     private void placePlayers() {
         boardArea.remove(whiteCard);
         boardArea.remove(blackCard);
@@ -158,14 +203,18 @@ final class MatchView extends JPanel {
         Game game = session.game();
         Move last = game.plyCount() == 0 ? null : game.moves().get(game.plyCount() - 1).move();
         board.update(game.position(), last, animation);
-        moves.update(game, game.plyCount());
+        moveHistory.update(game, game.plyCount());
         captures.update(game, game.plyCount());
-        if (table.getRowCount() > 0) table.scrollRectToVisible(table.getCellRect(table.getRowCount() - 1, 0, true));
+
         Side turn = game.position().turn();
+        boolean inCheck = game.outcome() == null && Rules.inCheck(game.position(), turn);
         String color = text.get("side." + turn);
-        status.setText(game.outcome() != null ? text.get("reason." + game.outcome().reason())
+        String statusText = game.outcome() != null ? text.get("reason." + game.outcome().reason())
                 : session.computerTurn() ? text.get("thinking")
-                : text.get(Rules.inCheck(game.position(), turn) ? "check" : "turn", color));
+                : text.get(inCheck ? "check" : "turn", color);
+        statusPill.setText(statusText);
+        statusPill.setForeground(inCheck ? ERROR_TEXT : PALE);
+
         undo.setEnabled(session.canUndo());
         hint.setEnabled(canPlay());
         resign.setEnabled(game.outcome() == null);
@@ -175,11 +224,16 @@ final class MatchView extends JPanel {
 
     private void paintClocks() {
         var times = session.times();
-        Side turn = session.game().position().turn();
-        whiteClock.setText(session.options().timed() ? clock(times.whiteMillis()) : "—");
-        blackClock.setText(session.options().timed() ? clock(times.blackMillis()) : "—");
-        whiteClock.setForeground(turn == Side.WHITE ? PALE : MUTED);
-        blackClock.setForeground(turn == Side.BLACK ? PALE : MUTED);
+        Game game = session.game();
+        Side turn = game.position().turn();
+        boolean ongoing = game.outcome() == null;
+        boolean inCheck = ongoing && Rules.inCheck(game.position(), turn);
+        boolean timed = session.options().timed();
+        String badge = inCheck ? text.get("inCheckBadge") : text.get("activeTurn");
+        whiteCard.update(timed ? clock(times.whiteMillis()) : "—", timed, ongoing && turn == Side.WHITE,
+                timed && times.whiteMillis() <= 30_000L, inCheck && turn == Side.WHITE, badge);
+        blackCard.update(timed ? clock(times.blackMillis()) : "—", timed, ongoing && turn == Side.BLACK,
+                timed && times.blackMillis() <= 30_000L, inCheck && turn == Side.BLACK, badge);
     }
 
     private void computer() {
@@ -217,7 +271,8 @@ final class MatchView extends JPanel {
                     if (result == null) return;
                     if (showingHint) {
                         board.showHint(result.move());
-                        status.setText(text.get("hintMove", San.format(position, result.move())));
+                        statusPill.setText(text.get("hintMove", San.format(position, result.move())));
+                        statusPill.setForeground(SUCCESS);
                     } else play(result.move());
                 } catch (CancellationException ignored) {
                     // A newer action owns the board.
@@ -255,6 +310,7 @@ final class MatchView extends JPanel {
     private void sound() {
         soundEnabled = !soundEnabled;
         sound.setText(text.get(soundEnabled ? "soundOn" : "soundOff"));
+        sound.setGlyph(soundEnabled ? RoyalIcons.Glyph.SOUND_ON : RoyalIcons.Glyph.SOUND_OFF);
         if (soundEnabled) frame.sounds().play("move");
     }
 
@@ -279,14 +335,12 @@ final class MatchView extends JPanel {
         if (!candidates.isEmpty()) actions.add(text.get("claimByMove"));
         if (agreement) actions.add(text.get("offer"));
         if (actions.isEmpty()) return;
-        Object choice = JOptionPane.showInputDialog(this, text.get("draw"), text.get("draw"),
-                JOptionPane.PLAIN_MESSAGE, null, actions.toArray(), actions.get(0));
+        String choice = RoyalDialog.choose(this, text.get("draw"), null, actions, text.get("cancel"));
         if (choice == null || !canPlay()) return;
         if (choice.equals(text.get("claim"))) session.claimDraw(null);
         else if (choice.equals(text.get("claimByMove"))) {
             var san = candidates.stream().map(move -> San.format(game.position(), move)).toList();
-            Object selection = JOptionPane.showInputDialog(this, text.get("claimByMove"), text.get("draw"),
-                    JOptionPane.PLAIN_MESSAGE, null, san.toArray(), san.get(0));
+            String selection = RoyalDialog.choose(this, text.get("claimByMove"), null, san, text.get("cancel"));
             if (selection == null || !canPlay()) return;
             session.claimDraw(candidates.get(san.indexOf(selection)));
         } else if (frame.confirm("agree") && canPlay()) session.agreeDraw();
@@ -294,7 +348,10 @@ final class MatchView extends JPanel {
     }
 
     private void resign() {
-        if (leaving || session.game().outcome() != null || !frame.confirm("confirmResign") || session.game().outcome() != null) return;
+        if (leaving || session.game().outcome() != null
+                || !RoyalDialog.confirm(this, text.get("resign"), text.get("confirmResign"),
+                        text.get("resign"), text.get("cancel"), true)
+                || session.game().outcome() != null) return;
         session.resign();
         refresh(false);
         finish();
@@ -344,11 +401,10 @@ final class MatchView extends JPanel {
     void leave(Runnable next) {
         if (!active || leaving) return;
         if (session.game().outcome() == null && !prefs.autosave()) {
-            int answer = JOptionPane.showOptionDialog(this, text.get("unsaved"), text.get("save"),
-                    JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null,
-                    new Object[]{text.get("save"), text.get("discard"), text.get("cancel")}, text.get("save"));
-            if (answer < 0 || answer == 2) return;
-            if (answer == 1) { close(); next.run(); return; }
+            String choice = RoyalDialog.choose(this, text.get("save"), text.get("unsaved"),
+                    List.of(text.get("save"), text.get("discard")), text.get("cancel"));
+            if (choice == null) return;
+            if (choice.equals(text.get("discard"))) { close(); next.run(); return; }
         }
         leaving = true;
         cancelSearch();

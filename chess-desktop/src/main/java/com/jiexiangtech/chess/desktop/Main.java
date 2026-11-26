@@ -25,7 +25,8 @@ public final class Main {
             smoke();
             return;
         }
-        Path screenshots = args.length == 2 && args[0].equals("--visual-smoke") ? Path.of(args[1]) : null;
+        boolean fullQa = args.length == 3 && args[0].equals("--visual-smoke") && args[2].equals("--all");
+        Path screenshots = (args.length >= 2 && args[0].equals("--visual-smoke")) ? Path.of(args[1]) : null;
         if (GraphicsEnvironment.isHeadless()) {
             throw new IllegalStateException("ChessMaster requires a graphical desktop. Use --smoke to validate the installation.");
         }
@@ -36,7 +37,7 @@ public final class Main {
         try { art = AssetManager.read("assets/" + BrandingManager.SPLASH); }
         catch (java.io.IOException e) { LoggerFactory.getLogger(Main.class).warn("Unable to load splash artwork", e); }
         BufferedImage splash = art;
-        SwingUtilities.invokeLater(() -> launch(screenshots, splash));
+        SwingUtilities.invokeLater(() -> launch(screenshots, fullQa, splash));
     }
 
     private static String language() { return Locale.getDefault().getLanguage().equals("vi") ? "vi" : "en"; }
@@ -53,7 +54,7 @@ public final class Main {
         return new Boot(store, assets, engines, store.rememberedUsername(), store.settings(ChessStore.GUEST_ID, language()));
     }
 
-    private static void launch(Path screenshots, BufferedImage artwork) {
+    private static void launch(Path screenshots, boolean fullQa, BufferedImage artwork) {
         FlatDarkLaf.setup();
         RoyalStyle.install();
         I18n text = new I18n(language());
@@ -76,9 +77,11 @@ public final class Main {
                         frame.setVisible(true);
                         if (!ready.assets().missing().isEmpty()) {
                             LoggerFactory.getLogger(Main.class).warn("Missing assets: {}", ready.assets().missing());
-                            JOptionPane.showMessageDialog(frame, text.get("missingAssets") + "\n" + String.join("\n", ready.assets().missing()));
+                            RoyalDialog.message(frame, text.get("error"),
+                                    text.get("missingAssets") + "\n" + String.join("\n", ready.assets().missing()),
+                                    text.get("close"), true);
                         }
-                        if (screenshots != null) capture(frame, screenshots);
+                        if (screenshots != null) capture(frame, screenshots, fullQa);
                     });
                 } catch (InterruptedException e) {
                     splash.dispose();
@@ -112,11 +115,12 @@ public final class Main {
         System.out.println("ChessMaster smoke OK: assets, SQLite migrations/profile, puzzles, perft(3)=8902");
     }
 
-    private static void capture(RoyalFrame frame, Path folder) {
+    private static void capture(RoyalFrame frame, Path folder, boolean fullQa) {
+        Dimension normalSize = frame.getSize();
         later(500, () -> {
             saveImage(frame, folder, "login");
             frame.visualGuest();
-            later(800, () -> {
+            later(750, () -> {
                 saveImage(frame, folder, "dashboard");
                 frame.visualMatch();
                 later(600, () -> {
@@ -125,7 +129,60 @@ public final class Main {
                     frame.validate();
                     later(300, () -> {
                         saveImage(frame, folder, "gameplay-minimum");
-                        frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
+                        if (!fullQa) {
+                            frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
+                            return;
+                        }
+                        frame.setSize(normalSize);
+                        frame.validate();
+                        captureExtended(frame, folder);
+                    });
+                });
+            });
+        });
+    }
+
+    private static void captureExtended(RoyalFrame frame, Path folder) {
+        frame.visualNewGame();
+        later(450, () -> {
+            saveImage(frame, folder, "new-game");
+            frame.visualPuzzles();
+            later(500, () -> {
+                saveImage(frame, folder, "puzzles");
+                frame.visualPuzzlePlay();
+                later(400, () -> {
+                    saveImage(frame, folder, "puzzle-play");
+                    frame.visualHistory();
+                    later(500, () -> {
+                        saveImage(frame, folder, "history");
+                        frame.visualLeaderboard();
+                        later(500, () -> {
+                            saveImage(frame, folder, "leaderboard");
+                            frame.visualStatistics();
+                            later(500, () -> {
+                                saveImage(frame, folder, "statistics");
+                                frame.visualAchievements();
+                                later(500, () -> {
+                                    saveImage(frame, folder, "achievements");
+                                    frame.visualSettings();
+                                    later(500, () -> {
+                                        saveImage(frame, folder, "settings");
+                                        frame.visualResult();
+                                        later(450, () -> {
+                                            saveImage(frame, folder, "result");
+                                            JDialog about = frame.visualAboutDialog();
+                                            about.setModal(false);
+                                            about.setVisible(true);
+                                            later(300, () -> {
+                                                saveContainer(about.getContentPane(), folder, "about");
+                                                about.dispose();
+                                                frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
+                                            });
+                                        });
+                                    });
+                                });
+                            });
+                        });
                     });
                 });
             });
@@ -139,8 +196,11 @@ public final class Main {
     }
 
     private static void saveImage(RoyalFrame frame, Path folder, String name) {
-        Container content = frame.getContentPane();
-        var image = new BufferedImage(content.getWidth(), content.getHeight(), BufferedImage.TYPE_INT_RGB);
+        saveContainer(frame.getContentPane(), folder, name);
+    }
+
+    private static void saveContainer(Container content, Path folder, String name) {
+        var image = new BufferedImage(Math.max(1, content.getWidth()), Math.max(1, content.getHeight()), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         content.printAll(graphics);
         graphics.dispose();
