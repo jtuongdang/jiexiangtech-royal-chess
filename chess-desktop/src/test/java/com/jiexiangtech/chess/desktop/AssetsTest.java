@@ -26,6 +26,36 @@ class AssetsTest {
         }
     }
 
+    @Test void classicBoardUsesReferenceBezelAndPieceRatios() {
+        var assets = new AssetManager();
+        var frame = assets.classicFrame();
+        assertEquals(828, frame.getWidth());
+        assertEquals(842, frame.getHeight());
+        assertEquals(0, frame.getRGB(414, 421) >>> 24);
+        assertNotEquals(0, frame.getRGB(414, 10) >>> 24);
+        for (boolean light : new boolean[]{false, true}) {
+            for (int i = 1; i < 4; i++) {
+                assertEquals(256, assets.tile(light, i).getWidth());
+                assertNotSame(assets.tile(light, 0), assets.tile(light, i));
+            }
+        }
+
+        for (int size : new int[]{450, 650, 920, 1300}) {
+            var board = BoardCoordinateMapper.fit(size + 12, size, false);
+            int span = board.tile() * 8;
+            assertTrue(board.x() - board.leftBezel() >= 0);
+            assertTrue(board.y() + span + board.bottomBezel() <= size);
+            assertEquals(68.0 / 713, board.leftBezel() / (double) span, .5 / span);
+            assertEquals(69.0 / 730, board.bottomBezel() / (double) span, .5 / span);
+            var cell = board.bounds(Square.parse("e4"));
+            assertEquals(cell.width, cell.height);
+            var knight = RoyalPieceRenderer.classicBounds(Piece.of(Side.WHITE, Kind.KNIGHT), cell, 97, false);
+            assertEquals(67.0 * 8 / 713, knight.width / (double) cell.width, .5 / cell.width);
+            assertEquals(77.0 * 8 / 730, knight.height / (double) cell.height, .5 / cell.height);
+            assertEquals(.928, (knight.y + knight.height - cell.y) / (double) cell.height, .5 / cell.height);
+        }
+    }
+
     @Test void corporateArtworkAndAllIconSizesArePackaged() throws Exception {
         var assets = new AssetManager();
         assertEquals(1672, assets.brand(BrandingManager.SPLASH).getWidth());

@@ -36,27 +36,14 @@ final class RoyalPieceRenderer {
     }
 
     void drawPiece(Graphics2D g, Piece piece, Rectangle tile, int pieceScalePercent,
-                   boolean highQuality, boolean onDarkSquare, boolean dragged) {
+                   boolean highQuality, boolean dragged) {
         if (piece == null) return;
         BufferedImage source = assets.piece(piece);
         Rectangle srcBounds = assets.pieceBounds(piece);
 
-        double userScale = pieceScalePercent / 97.0;
-        double lift = dragged ? 1.07 : 1.0;
-        double targetH = tile.height * heightRatio(piece.kind()) * userScale * lift;
-        double maxW = tile.width * 0.86 * lift;
-        double scale = Math.min(targetH / srcBounds.height, maxW / srcBounds.width);
-
-        int dw = Math.max(4, (int) Math.round(srcBounds.width * scale));
-        int dh = Math.max(4, (int) Math.round(srcBounds.height * scale));
-        int baseY = tile.y + (int) Math.round(tile.height * 0.945) - (dragged ? Math.max(4, tile.height / 10) : 0);
-        int dx = tile.x + (tile.width - dw) / 2;
-        int dy = baseY - dh;
-
-        if (piece.side() == Side.BLACK && onDarkSquare && !dragged) {
-            g.setColor(new Color(228, 192, 102, 42));
-            g.fillOval(dx - 3, dy + dh / 5, dw + 6, dh * 3 / 4);
-        }
+        Rectangle bounds = classicBounds(piece, tile, pieceScalePercent, dragged);
+        int dx = bounds.x, dy = bounds.y, dw = bounds.width, dh = bounds.height;
+        int baseY = dy + dh;
 
         int shadowW = Math.max(8, (int) Math.round(dw * (dragged ? 1.08 : 0.98)));
         int shadowH = Math.max(4, (int) Math.round(tile.height * (dragged ? 0.15 : 0.115)));
@@ -81,6 +68,34 @@ final class RoyalPieceRenderer {
 
         BufferedImage cached = scaledSprite(piece, source, srcBounds, pw, ph, highQuality);
         g.drawImage(cached, dx, dy, dw, dh, null);
+    }
+
+    static Rectangle classicBounds(Piece piece, Rectangle tile, int scalePercent, boolean dragged) {
+        boolean black = piece.side() == Side.BLACK;
+        // Measured visible silhouettes in Interface-2, divided by the reference cell pitch.
+        int referenceWidth = switch (piece.kind()) {
+            case ROOK, PAWN -> 52;
+            case KNIGHT -> black ? 65 : 67;
+            case BISHOP -> 50;
+            case QUEEN -> 65;
+            case KING -> black ? 64 : 67;
+        };
+        int referenceHeight = switch (piece.kind()) {
+            case ROOK -> black ? 76 : 74;
+            case PAWN -> black ? 72 : 70;
+            case KNIGHT -> black ? 80 : 77;
+            case BISHOP -> black ? 83 : 80;
+            case QUEEN -> black ? 81 : 79;
+            case KING -> black ? 86 : 84;
+        };
+        double scale = scalePercent / 97.0 * (dragged ? 1.07 : 1.0);
+        int width = Math.max(1, (int) Math.round(tile.width * referenceWidth * scale * 8
+                / BoardCoordinateMapper.REFERENCE_GRID_WIDTH));
+        int height = Math.max(1, (int) Math.round(tile.height * referenceHeight * scale * 8
+                / BoardCoordinateMapper.REFERENCE_GRID_HEIGHT));
+        double base = black ? .951 : .928;
+        int baseY = tile.y + (int) Math.round(tile.height * base) - (dragged ? Math.max(4, tile.height / 10) : 0);
+        return new Rectangle(tile.x + (tile.width - width) / 2, baseY - height, width, height);
     }
 
     /**

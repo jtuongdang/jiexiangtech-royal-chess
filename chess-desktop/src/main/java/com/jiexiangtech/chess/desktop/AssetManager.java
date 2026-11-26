@@ -7,7 +7,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +21,7 @@ final class AssetManager {
     private static final int ALPHA_THRESHOLD = 16;
 
     private final Map<String, BufferedImage> images = new HashMap<>();
+    private final BufferedImage[][] tiles = new BufferedImage[2][4];
     private final Map<Piece, Rectangle> contentBounds = new HashMap<>();
     private final List<String> missing = new ArrayList<>();
 
@@ -35,7 +35,15 @@ final class AssetManager {
                 if (img != null) contentBounds.put(piece, computeVisibleBounds(img));
             }
         }
-        for (String name : List.of("board", "board-grid", "tile-light", "tile-dark")) load("board/" + name + ".png");
+        for (String name : List.of("board", "board-grid", "classic-frame")) load("board/" + name + ".png");
+        for (boolean light : new boolean[]{false, true}) {
+            int color = light ? 1 : 0;
+            for (int i = 0; i < tiles[color].length; i++) {
+                String key = tilePath(light, i);
+                load(key);
+                tiles[color][i] = images.get(key);
+            }
+        }
         for (String path : List.of(BrandingManager.SPLASH, BrandingManager.LOGIN, BrandingManager.DASHBOARD,
                 BrandingManager.GAMEPLAY_BG, BrandingManager.FOCUS_BG, BrandingManager.GAME, BrandingManager.COMPANY,
                 BrandingManager.COMPANY_HORIZONTAL, BrandingManager.EMBLEM, "branding/app-icon.png")) {
@@ -82,7 +90,13 @@ final class AssetManager {
     }
 
     BufferedImage board() { return images.get("board/board.png"); }
-    BufferedImage tile(boolean light) { return images.get(light ? "board/tile-light.png" : "board/tile-dark.png"); }
+    BufferedImage classicFrame() { return images.get("board/classic-frame.png"); }
+    BufferedImage tile(boolean light) { return tile(light, 0); }
+    BufferedImage tile(boolean light, int variant) { return tiles[light ? 1 : 0][variant]; }
+
+    private static String tilePath(boolean light, int variant) {
+        return (light ? "board/tile-light" : "board/tile-dark") + (variant == 0 ? "" : "-" + variant) + ".png";
+    }
     List<String> missing() { return List.copyOf(missing); }
     BufferedImage brand(String path) { return images.get(path); }
     BufferedImage focusAsset(String relativePath) { return images.get("focus-mode/" + relativePath); }

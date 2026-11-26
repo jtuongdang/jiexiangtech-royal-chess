@@ -1,14 +1,14 @@
 # Design system
 
 Royal Luxury combines obsidian surfaces, ivory and onyx marble, metallic gold accents, and the
-supplied Staunton chess artwork. The approved Splash and Login screens establish the visual
+chess artwork redrawn from the supplied Classic board reference. The approved Splash and Login screens establish the visual
 baseline for the entire desktop client.
 
 JIEXIANGTECH (杰祥科技) branding is centralized in `BrandConstants` and `BrandingManager`.
 `AssetManager` loads images once from the classpath for both IDE and bundled launchers, and
 computes visible alpha bounds (`alpha > 16`) for all 12 piece sprites so pieces render at full
-proportional scale without transparent canvas shrinkage. `ThemeManager` applies the Royal Slate
-treatment to the original tile textures.
+reference-matched size without transparent canvas shrinkage. `ThemeManager` applies the Royal Slate
+treatment to the marble tile textures.
 
 ## Color tokens
 
@@ -40,6 +40,6 @@ treatment to the original tile textures.
 
 ## Board craftsmanship and responsiveness
 
-- `BoardCoordinateMapper` fits the 8×8 board tightly with a `20px` obsidian-gold bezel and centered rank/file coordinates.
-- `ChessBoardPanel` renders subtle ambient gold board glow, visible-bounds-scaled pieces (`King > Queen > Bishop > Knight > Rook > Pawn`) aligned on a shared baseline, layered contact shadows, warm rim lift behind black pieces on dark squares, hover/selection/legal-move/last-move/check/hint-arrow visual feedback, cubic ease-out move animation, and elevated drag rendering.
+- `BoardCoordinateMapper` fits an 8×8 square grid and the asymmetric gold bezel measured from [Interface-2](design/ROYAL_CLASSIC_BOARD.md).
+- Classic pieces follow measured per-kind and per-side bounds. The renderer paints the frame, marble squares, pieces, coordinates, shadows and highlights as separate layers. Royal Focus uses the same sprites with its perspective camera and dynamic depth ordering.
 - Minimum supported window size remains `1020 × 690` pixels, verified alongside standard desktop and fullscreen layouts on macOS Retina displays. English and Vietnamese resource bundles maintain full key parity.

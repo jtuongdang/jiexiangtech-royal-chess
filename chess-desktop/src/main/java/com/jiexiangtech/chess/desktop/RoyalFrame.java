@@ -1540,12 +1540,12 @@ final class RoyalFrame extends JFrame {
         var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
                 MatchOptions.Level.HARD, 600_000, 5000, "royal"), System::nanoTime);
         game.resume();
-        for (String move : "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 d7c6".split(" ")) game.play(Move.uci(move));
+        for (String move : "g1f3 g8f6 f3g5 f6g8 g5e4 a7a6".split(" ")) game.play(Move.uci(move));
         game.pause();
         live(game);
         if (match != null) {
             match.setFocusMode(false, false);
-            match.boardPanel().selectSquare(Square.at(3, 1));
+            match.boardPanel().selectSquare(Square.at(4, 3));
         }
     }
 

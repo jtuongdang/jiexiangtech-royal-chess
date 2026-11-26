@@ -26,7 +26,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
     @Override
     public void paint(Graphics2D g, RenderState s) {
         BoardCoordinateMapper board = BoardCoordinateMapper.fit(s.width(), s.height(), s.flipped());
-        RoyalBoardFrame.paintOuterFrame(g, board);
+        RoyalBoardFrame.paintOuterFrame(g, board, assets.classicFrame());
 
         for (int square = 0; square < 64; square++) drawTile(g, board.bounds(square), square, s.theme());
 
@@ -44,9 +44,9 @@ final class Classic2DBoardRenderer implements BoardRenderer {
 
         if (s.selected() >= 0) {
             Rectangle sArea = board.bounds(s.selected());
-            fill(g, sArea, new Color(255, 224, 114, Math.round(115 + 35 * s.pulse())));
+            fill(g, sArea, new Color(255, 224, 114, Math.round(49 + 25 * s.pulse())));
             RoyalGlowEffect.paintAmbientSpotlight(g, (float) sArea.getCenterX(), (float) sArea.getCenterY(),
-                    sArea.width * 0.72f, new Color(255, 232, 138, Math.round(135 + 45 * s.pulse())));
+                    sArea.width * 0.72f, new Color(255, 232, 138, Math.round(68 + 32 * s.pulse())));
             RoyalGlowEffect.paintOuterGlow(g, sArea.x, sArea.y, sArea.width, sArea.height, 4,
                     new Color(255, 222, 112, Math.round(165 + 50 * s.pulse())), 4);
             outline(g, sArea, new Color(0xFFF6C8), 3.0f);
@@ -78,7 +78,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
         if (t < 1.0 && s.disappearing() != null && s.capturedSquare() >= 0) {
             g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0.0, 1.0 - t)));
             pieceRenderer.drawPiece(g, s.disappearing(), board.bounds(s.capturedSquare()),
-                    s.preferences().pieceScale(), s.preferences().highQuality(), isDark(s.capturedSquare()), false);
+                    s.preferences().pieceScale(), s.preferences().highQuality(), false);
             g.setComposite(AlphaComposite.SrcOver);
         }
 
@@ -87,7 +87,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
             if (piece != null && !(square == s.selected() && s.dragPoint() != null)
                     && !(t < 1.0 && s.last() != null && square == s.last().to())) {
                 pieceRenderer.drawPiece(g, piece, board.bounds(square),
-                        s.preferences().pieceScale(), s.preferences().highQuality(), isDark(square), false);
+                        s.preferences().pieceScale(), s.preferences().highQuality(), false);
             }
         }
 
@@ -99,7 +99,7 @@ final class Classic2DBoardRenderer implements BoardRenderer {
                     from.y + (int) Math.round((to.y - from.y) * eased),
                     from.width, from.height);
             pieceRenderer.drawPiece(g, s.position().piece(s.last().to()), moving,
-                    s.preferences().pieceScale(), s.preferences().highQuality(), isDark(s.last().to()), false);
+                    s.preferences().pieceScale(), s.preferences().highQuality(), false);
         }
 
         if (s.hint() != null) drawHintArrow(g, board.bounds(s.hint().from()), board.bounds(s.hint().to()));
@@ -108,10 +108,10 @@ final class Classic2DBoardRenderer implements BoardRenderer {
             int tile = board.tile();
             pieceRenderer.drawPiece(g, s.position().piece(s.selected()),
                     new Rectangle(s.dragPoint().x - tile / 2, s.dragPoint().y - tile / 2, tile, tile),
-                    s.preferences().pieceScale(), s.preferences().highQuality(), true, true);
+                    s.preferences().pieceScale(), s.preferences().highQuality(), true);
         }
 
-        RoyalBoardFrame.paintInnerShadowAndCoordinates(g, board);
+        RoyalBoardFrame.paintCoordinates(g, board);
         if (s.celebrating()) paintSparks(g, board.x() + board.tile() * 4, board.y() + board.tile() * 4, board.tile() * 8, s.celebrationProgress());
         if (s.overlayTitle() != null) paintOutcomeOverlay(g, board.x(), board.y(), board.tile() * 8, board.tile() * 8,
                 s.overlayTitle(), s.overlaySubtitle(), s.overlayAccent(), s.overlayAlpha());
@@ -119,7 +119,8 @@ final class Classic2DBoardRenderer implements BoardRenderer {
 
     private void drawTile(Graphics2D g, Rectangle area, int square, String theme) {
         boolean light = !isDark(square);
-        BufferedImage image = assets.tile(light);
+        int variant = (Square.file(square) ^ (Square.rank(square) >> 1)) & 3;
+        BufferedImage image = assets.tile(light, variant);
         if (image == null) fill(g, area, light ? new Color(0xCBB28E) : new Color(0x2D241E));
         else g.drawImage(image, area.x, area.y, area.width, area.height, null);
         Color glaze = ThemeManager.glaze(theme, light);
@@ -156,11 +157,11 @@ final class Classic2DBoardRenderer implements BoardRenderer {
             g.setStroke(new BasicStroke(1));
         } else {
             RoyalGlowEffect.paintAmbientSpotlight(g, (float) cx, (float) cy, area.width * 0.44f,
-                    new Color(172, 198, 106, Math.round(62 + 26 * pulse)));
-            double r = Math.max(6.5, area.width * 0.21);
-            g.setColor(new Color(176, 194, 108, Math.round(135 + 35 * pulse)));
+                    new Color(219, 152, 61, Math.round(80 + 32 * pulse)));
+            double r = Math.max(3.5, area.width * 0.115);
+            g.setColor(new Color(236, 185, 105, Math.round(160 + 28 * pulse)));
             g.fill(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
-            g.setColor(new Color(235, 240, 175, Math.round(145 + 45 * pulse)));
+            g.setColor(new Color(255, 221, 151, Math.round(166 + 40 * pulse)));
             g.setStroke(new BasicStroke(1.5f));
             g.draw(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
             g.setStroke(new BasicStroke(1));

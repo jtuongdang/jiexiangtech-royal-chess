@@ -1,32 +1,31 @@
 # Royal Luxury assets
 
-The 18 PNG sources were inspected visually on a contact sheet. The 12 individual
-transparent pieces were selected over the two composite reference sheets.
-Piece bounds use nonzero alpha. All sprites have proportional scaling and a
-centered bottom anchor at y=488 on a transparent 512 × 512 canvas.
+Target paths are relative to assets/themes/royal. Original assets are preserved locally in
+raw-assets. The current 12 sprites come from a transparent ImageGen atlas based on
+Chessmaster Royal Edition Interface-2.png. Each is isolated, proportionally resampled and
+bottom-centered on a transparent 512 × 512 canvas. The grid and pieces are drawn separately
+at runtime. Classic uses the carved frame and marble from the top-down reference.
 
-Target paths below are relative to assets/themes/royal.
-
-| Source | Target | Source → output | Check |
+| Source | Target | Source → output | Processing |
 | --- | --- | --- | --- |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_18 PM-1.png` | `pieces/white/rook.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_20 PM-2.png` | `pieces/white/knight.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_21 PM-3.png` | `pieces/white/bishop.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_22 PM-4.png` | `pieces/white/queen.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_24 PM-5.png` | `pieces/white/king.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_while/ChatGPT Image Nov 26, 2026 at 03_45_25 PM-6.png` | `pieces/white/pawn.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_24 PM-1.png` | `pieces/black/rook.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_25 PM-2.png` | `pieces/black/knight.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_27 PM-3.png` | `pieces/black/bishop.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_28 PM-4.png` | `pieces/black/queen.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_29 PM-5.png` | `pieces/black/king.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/imgchess/check_black/ChatGPT Image Nov 26, 2026 at 03_41_30 PM-6.png` | `pieces/black/pawn.png` | 1254 × 1254 → 512 × 512 | RGBA, visual identity verified |
-| `raw-assets/royal_chessboard.png` | `board/board.png` | 2048 × 2048 → 2048 × 2048 | Copied byte for byte |
-| `raw-assets/royal_chessboard_grid.png` | `board/board-grid.png` | 1920 × 1920 → 1920 × 1920 | Copied byte for byte |
-| `raw-assets/royal_tile_light.png` | `board/tile-light.png` | 256 × 256 → 256 × 256 | Copied byte for byte |
-| `raw-assets/royal_tile_dark.png` | `board/tile-dark.png` | 256 × 256 → 256 × 256 | Copied byte for byte |
-| `raw-assets/table_chess/Luxe Marble Chess Asset Collection-2.png` | `—` | 1536 × 1024 → — | Composite reference retained |
-| `raw-assets/table_chess/Luxury Ivory Chess Asset Sheet.png` | `—` | 1536 × 1024 → — | Composite reference retained |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/rook.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/1 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/knight.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/2 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/bishop.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/3 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/queen.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/4 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/king.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/5 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/black/pawn.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/6 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/rook.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/1 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/knight.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/2 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/bishop.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/3 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/queen.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/4 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/king.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/5 |
+| `raw-assets/royal-classic-sprites.png` | `pieces/white/pawn.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/6 |
+| `raw-assets/royal-interface-2.png` | `board/classic-frame.png` | 1586 × 992 → 828 × 842 | Bezel only. Baked coordinate glyphs removed. Playing area is transparent. |
+| `raw-assets/royal-interface-2.png` | `board/tile-light*.png, board/tile-dark*.png` | 1586 × 992 → 8 × (256 × 256) | Four unoccupied marble samples of each shade |
+| `raw-assets/royal_chessboard.png` | `board/board.png` | 2048 × 2048 | Legacy decorative artwork retained |
+| `raw-assets/royal_chessboard_grid.png` | `board/board-grid.png` | 1920 × 1920 | Legacy decorative artwork retained |
+
+The original individual sprites, marble tiles and composite sheets are still in raw-assets.
 
 ## Corporate branding
 

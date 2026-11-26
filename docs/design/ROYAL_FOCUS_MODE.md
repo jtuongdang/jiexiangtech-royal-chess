@@ -52,3 +52,12 @@ All coordinates below were measured directly from `royal-focus-reference.png` (`
 | Board front outer width (`% W`) | `72.75%` | `71.25%` | `-1.50%` |
 | Perspective taper (`topW / botW`) | `0.5879` | `0.5910` | `+0.0031` |
 | Frame bezel ratios (`L / R / T / B`) | `0.050 / 0.050 / 0.026 / 0.068` | `0.050 / 0.050 / 0.026 / 0.068` | `0.000` |
+
+## Sprite and marble refresh
+
+Royal Focus uses the same redrawn onyx and ivory pieces and the primary light and dark
+marble samples introduced for [Classic 2D](ROYAL_CLASSIC_BOARD.md). The original 2.5D
+reference remains the camera and geometry baseline. The projective grid, live 2D ↔ 2.5D
+toggle and SQLite preferences use the existing geometry and state.
+
+[Current live capture](../screenshots/royal-focus-actual.png) · [Focus comparison](../screenshots/royal-focus-comparison.png)
