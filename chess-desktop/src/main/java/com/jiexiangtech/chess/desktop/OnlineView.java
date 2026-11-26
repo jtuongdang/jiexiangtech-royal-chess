@@ -222,8 +222,12 @@ final class OnlineView extends JPanel {
             repaint();
         });
 
-        JPanel formCard = card(new BorderLayout(0, 14));
-        formCard.setPreferredSize(new Dimension(520, formCard.getPreferredSize().height));
+        JPanel formCard = new RoyalCard(new BorderLayout(0, 14)) {
+            @Override public Dimension getPreferredSize() {
+                Dimension pref = super.getPreferredSize();
+                return new Dimension(Math.max(520, pref.width), pref.height);
+            }
+        };
         formCard.add(stack(tabBar, Box.createVerticalStrut(14), divider(), Box.createVerticalStrut(14),
                 tabCards, Box.createVerticalStrut(10), divider(), Box.createVerticalStrut(6),
                 serverToggle, serverRow), BorderLayout.CENTER);
