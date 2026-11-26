@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      staged-macos:
+        description: Verify Apple Silicon packages staged in an unpublished release after native smoke tests
+        type: boolean
+        default: false
 
 concurrency:
   group: desktop-release
@@ -14,19 +19,15 @@ jobs:
   verify:
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
+    with:
+      staged-macos: ${{ inputs.staged-macos }}
 
   package:
     needs: verify
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux
-          - os: macos-26
-            platform: macos
-          - os: windows-latest
-            platform: windows
+        os: ${{ fromJSON(inputs.staged-macos && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-26","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -76,12 +77,48 @@ jobs:
       - name: Upload verified native application
         uses: actions/upload-artifact@v4
         with:
-          name: application-${{ matrix.platform }}
+          name: application-${{ runner.os }}
           path: dist/upload/*
           if-no-files-found: error
 
+  verify-staged-macos:
+    if: inputs.staged-macos
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: application-portable
+          path: portable
+      - name: Verify both Apple Silicon packages against the tested JAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 scripts/verify-macos-release.py --version)
+          gh release view "v$version" --json isDraft,targetCommitish |
+            jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha' >/dev/null
+          gh release download "v$version" --dir staged --pattern 'royal-chess-macos-arm64.*'
+          if ! command -v 7z >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y 7zip
+          fi
+          python3 scripts/verify-macos-release.py "$version" "portable/royal-chess-$version-all.jar" staged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-macOS
+          path: staged/royal-chess-macos-arm64.*
+          if-no-files-found: error
+
   publish:
-    needs: package
+    needs: [package, verify-staged-macos]
+    if: >-
+      ${{ !cancelled() && needs.package.result == 'success' &&
+      (inputs.staged-macos && needs.verify-staged-macos.result == 'success' ||
+      !inputs.staged-macos && needs.verify-staged-macos.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -96,13 +133,9 @@ jobs:
       - name: Create a release from verified artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          STAGED_MACOS: ${{ inputs.staged-macos }}
         run: |
-          version=$(python3 - <<'PY'
-          from xml.etree import ElementTree
-          root = ElementTree.parse('pom.xml').getroot()
-          print(root.find('{http://maven.apache.org/POM/4.0.0}version').text)
-          PY
-          )
+          version=$(python3 scripts/verify-macos-release.py --version)
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="v$version"
           if [[ -n "$(git ls-remote origin "refs/tags/$tag")" ]]; then
@@ -117,5 +150,16 @@ jobs:
             verified/royal-chess-linux-x86_64.tar.gz
           )
           sha256sum "${packages[@]}" | sed 's#  .*/#  #' > SHA256SUMS.txt
-          gh release create "$tag" --target "$GITHUB_SHA" --title "ChessMaster – Royal Edition $tag" \
-            --generate-notes "${packages[@]}" SHA256SUMS.txt LICENSE THIRD_PARTY.md
+          if [[ "$STAGED_MACOS" == true ]]; then
+            gh release view "$tag" --json isDraft,targetCommitish |
+              jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha' >/dev/null
+            gh release download "$tag" --dir recheck --pattern 'royal-chess-macos-arm64.*'
+            cmp "${packages[1]}" recheck/royal-chess-macos-arm64.dmg
+            cmp "${packages[2]}" recheck/royal-chess-macos-arm64.zip
+            gh release upload "$tag" --clobber "${packages[0]}" "${packages[3]}" "${packages[4]}" \
+              SHA256SUMS.txt LICENSE THIRD_PARTY.md
+            gh release edit "$tag" --draft=false --latest --target "$GITHUB_SHA"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "ChessMaster – Royal Edition $tag" \
+              --generate-notes "${packages[@]}" SHA256SUMS.txt LICENSE THIRD_PARTY.md
+          fi

@@ -63,3 +63,6 @@ job was cancelled. The local macOS Maven reactor and desktop smoke test passed.
 For desktop v1.1.0, the macOS Swing launcher refreshed the live Focus capture and reference
 comparison. The Apple Silicon DMG was generated, its integrity verified with `hdiutil`, and
 its bundled native launcher passed `--smoke` after mounting the image.
+The Apple Silicon ZIP's native launcher also passed. In a warmed, offscreen 2× Retina
+sample, the Expert engine returned a legal reply and the two Ultra renderers painted it.
+The 95th-percentile paint times were 5.2 ms for Classic and 11.8 ms for Focus on this Mac.
