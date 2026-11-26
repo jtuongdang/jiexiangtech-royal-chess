@@ -1,0 +1,7 @@
+{
+  "id": "royal-slate",
+  "name": "Royal Slate",
+  "baseAssets": "royal",
+  "tileTreatment": "cool slate glaze over the original marble",
+  "unlockedBy": "puzzle-master"
+}

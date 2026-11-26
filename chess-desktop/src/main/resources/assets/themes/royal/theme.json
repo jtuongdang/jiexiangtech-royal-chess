@@ -1,0 +1,9 @@
+{
+  "id": "royal",
+  "name": "Royal Luxury",
+  "pieceCanvas": 512,
+  "pieceAnchor": [256, 488],
+  "liveBoard": ["board/tile-light.png", "board/tile-dark.png"],
+  "referenceBoard": "board/board.png",
+  "grid": "board/board-grid.png"
+}

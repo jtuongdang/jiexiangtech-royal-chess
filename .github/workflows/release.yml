@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-15
+            platform: macos
+          - os: windows-latest
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+      - uses: actions/download-artifact@v4
+        with:
+          name: application-portable
+          path: chess-desktop/target
+      - name: Package for macOS
+        if: runner.os == 'macOS'
+        run: |
+          scripts/package-macos.sh dist/app app-image
+          CHESSMASTER_DATA_DIR="$(mktemp -d)" 'dist/app/ChessMaster Royal.app/Contents/MacOS/ChessMaster Royal' --smoke
+          mkdir -p dist/upload
+          ditto -c -k --keepParent 'dist/app/ChessMaster Royal.app' "dist/upload/royal-chess-macos-$(uname -m).zip"
+      - name: Package for Linux
+        if: runner.os == 'Linux'
+        run: |
+          scripts/package-linux.sh dist/app app-image
+          CHESSMASTER_DATA_DIR="$(mktemp -d)" dist/app/ChessMasterRoyal/bin/ChessMasterRoyal --smoke
+          mkdir -p dist/upload
+          tar -C dist/app -czf "dist/upload/royal-chess-linux-$(uname -m).tar.gz" ChessMasterRoyal
+      - name: Package for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/package-desktop.ps1 -Destination dist/app
+          $env:CHESSMASTER_DATA_DIR = Join-Path $env:RUNNER_TEMP "royal-windows-smoke"
+          $process = Start-Process -FilePath "dist/app/ChessMasterRoyal/ChessMasterRoyal.exe" -ArgumentList "--smoke" -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:CHESSMASTER_DATA_DIR/chessmaster.db")) {
+            throw "Native launcher smoke test failed"
+          }
+          New-Item -ItemType Directory -Path dist/upload
+          Compress-Archive -Path dist/app/ChessMasterRoyal -DestinationPath dist/upload/royal-chess-windows-x64.zip
+      - name: Upload verified native application
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-${{ matrix.platform }}
+          path: dist/upload/*
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check the tag version
+        run: |
+          python3 - <<'PY'
+          import os
+          from xml.etree import ElementTree
+          pom = ElementTree.parse('pom.xml')
+          version = pom.getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
+          if os.environ['GITHUB_REF_NAME'] != 'v' + version:
+              raise SystemExit('The release tag must match the Maven project version.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: application-*
+          path: verified
+          merge-multiple: true
+      - name: Create a release from verified artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' packages < <(find verified -type f \( -name '*-all.jar' -o -name '*.zip' -o -name '*.tar.gz' \) -print0)
+          if [ "${#packages[@]}" -ne 4 ]; then
+            echo "Expected one JAR and three native app images." >&2
+            exit 1
+          fi
+          sha256sum "${packages[@]}" | sed 's#  .*/#  #' > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${packages[@]}" SHA256SUMS.txt LICENSE THIRD_PARTY.md
