@@ -2,7 +2,7 @@
 
 November 26, 2026 · ChessMaster – Royal Edition · JIEXIANGTECH (杰祥科技)
 
-The existing four-module architecture (`com.jiexiangtech:royal-chess`) and working domain,
+The existing desktop architecture (`com.jiexiangtech:royal-chess`) and working domain,
 SQLite persistence, authentication, and AI engine layers were preserved in place. The desktop
 presentation layer now includes both **Classic 2D** and **Royal Focus Mode 2.5D**, matching the
 approved Splash/Login baseline and both official visual references.
@@ -20,11 +20,12 @@ approved Splash/Login baseline and both official visual references.
 | Persistence | SQLite migration, PBKDF2, per-profile data, atomic snapshots, safe rollback and replay-based restore |
 | AI | Four levels, time limits, cancellation, analysis and optional external Stockfish validated with Stockfish 19 |
 | Desktop verification | Maven passed all 29 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
+| Online beta | Desktop invite rooms and server-authoritative moves, clocks and outcomes implemented. HTTP, WebSocket and MongoDB reconnect/restart verified locally |
 | GitHub | Private repository at `jtuongdang/jiexiangtech-royal-chess` |
 
 ## Remaining scope
 
-- Online multiplayer / game server is intentionally deferred outside this stage.
+- Render and Atlas cloud setup require account access. The private Docker Hub server repository and release workflow are ready. Cloud accounts and rated matchmaking are later phases.
 - General dead-position and flag-fall adjudication still lack a complete reachability solver for unusual positions.
 - The replay import supports one PGN main line per file and is session-local. The history view filters local results without pagination.
 - Four verified puzzles currently cover mate in one. Multi-move puzzles are outside this release.
@@ -34,3 +35,5 @@ approved Splash/Login baseline and both official visual references.
 [Royal Focus Mode Spec](design/ROYAL_FOCUS_MODE.md) · [Architecture](ARCHITECTURE.md) · [Test report](TEST_REPORT.md) · [Design system](DESIGN_SYSTEM.md) · [Private repository](https://github.com/jtuongdang/jiexiangtech-royal-chess)
 
 [Classic board geometry and comparison](design/ROYAL_CLASSIC_BOARD.md)
+
+[Online deployment and local test guide](ONLINE_DEPLOYMENT.md)

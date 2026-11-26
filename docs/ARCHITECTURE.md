@@ -51,3 +51,16 @@ All rendering and visual effects live strictly inside `chess-desktop`:
 - **Perspective & Hit-Testing**: `PerspectiveProjection` solves the `3×3` projective homography `H` and exact inverse `H⁻¹`. `PerspectiveCoordinateMapper` calibrates the 2.5D trapezoid (`taper = 0.625`) from [ROYAL_FOCUS_MODE.md](design/ROYAL_FOCUS_MODE.md) and performs front-to-back billboard piece hitbox + inverse board-plane hit-testing across all 64 squares (supporting click-to-move, drag-and-drop, castling, en passant, promotion, flip, resize, and fullscreen).
 - **Texture Warping & Piece Caching**: `PerspectiveTextureRenderer` caches the inverse-homography warped 64-square marble surface into an offscreen `BufferedImage` (rebuilt only on resize, flip, theme, or quality change). `RoyalPieceRenderer` trims alpha bounds (`alpha > 16`) and maintains an LRU Retina-scaled progressive bicubic sprite cache. `PieceDepthSorter` enforces back-to-front painter's order.
 - **Cinematic Lighting & Animation**: `CinematicLightingEngine` (`SpotlightRenderer`, `VignetteRenderer`), `ShadowRenderer`, `ReflectionRenderer`, `RoyalGlowEffect`, and `RoyalAnimationEngine` (60 FPS coalesced `javax.swing.Timer` that stops automatically when idle) deliver smooth perspective move interpolation, piece lift arcs, selection bloom, check pulses, capture fade-outs, and outcome overlays with zero SQLite queries or EDT blocking.
+
+
+## Online beta
+
+The JVM server is a separate Maven module. Desktop and server share `chess-online-protocol`
+records and the chess domain. The Spring Boot backend serializes moves through a
+revision-checked update to the MongoDB room document. The server stores the clock deadline
+alongside the resulting position. Its WebSocket stream signals new revisions, and the
+desktop fetches the authoritative snapshot asynchronously.
+
+The desktop adds a scene for online play while reusing its existing board renderers.
+A separate local credential file supports returning to the most recent room per profile.
+The deployment image contains the server runtime. See [Online deployment](ONLINE_DEPLOYMENT.md).

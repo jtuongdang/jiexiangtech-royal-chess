@@ -3,11 +3,13 @@
   <parent><groupId>com.jiexiangtech</groupId><artifactId>royal-chess</artifactId><version>1.0.0</version></parent>
   <artifactId>chess-desktop</artifactId>
   <dependencies>
+    <dependency><groupId>com.jiexiangtech</groupId><artifactId>chess-online-protocol</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
     <dependency><groupId>com.jiexiangtech</groupId><artifactId>chess-application</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.jiexiangtech</groupId><artifactId>chess-infrastructure</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.formdev</groupId><artifactId>flatlaf</artifactId></dependency>
-    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></dependency>
-    <dependency><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><scope>runtime</scope></dependency>
+    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0.17</version></dependency>
+    <dependency><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><version>1.5.18</version><scope>runtime</scope></dependency>
   </dependencies>
   <build><finalName>royal-chess-${project.version}</finalName><plugins><plugin>
     <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.5.3</version>

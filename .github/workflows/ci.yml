@@ -54,3 +54,33 @@ jobs:
           name: application-portable
           path: chess-desktop/target/royal-chess-*-all.jar
           if-no-files-found: error
+
+  online-integration:
+    name: Online server · MongoDB and reconnect
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ROYAL_TEST_MONGO_URI: mongodb://127.0.0.1:27017/royal_ci
+    services:
+      mongo:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+      - run: mvn --batch-mode --no-transfer-progress -pl chess-server -am clean verify
+      - name: Upload server test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-online
+          path: chess-server/target/surefire-reports/
+          if-no-files-found: warn

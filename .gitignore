@@ -25,3 +25,6 @@ dist/
 # Source art is preserved on disk. Derived images and reviewed screenshots are tracked.
 /raw-assets/
 /branding/
+
+# Per-profile online beta credentials
+online-seat-*.json

@@ -10,7 +10,8 @@ Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and
 | Application | 3 | Restore repetition and clocks, validate and clear password buffers, verify each puzzle solution |
 | Infrastructure | 6 | Migrate and reopen SQLite, authenticate, force and recover a transaction rollback, restore and undo a game, award once, unlock theme and validate legal AI output |
 | Desktop | 6 | Sprite and bezel alpha, marble variants, Classic piece and bezel ratios, 2D and 2.5D coordinate round-trips, 2.5D click-to-move, offscreen rendering, icons and locale bundles |
-| **Total** | **29** | **0 failures, 0 errors, 0 skipped** |
+| Server | 6 | Invitation authorization, seat isolation, clocks, replay and dedupe, plus HTTP/WebSocket with real MongoDB across restart |
+| **Total** | **35** | **0 failures, 0 errors, 0 skipped** |
 
 ## Perft
 
@@ -41,3 +42,5 @@ Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and
   producing `dist/app/ChessMaster Royal.app` and `dist/ChessMaster Royal-1.0.0.dmg` (58 MB).
   The packaged native launcher (`ChessMaster Royal --smoke`) passed assets, SQLite migrations/profile,
   puzzles, and `perft(3)=8902` verification.
+
+The online test run set `ROYAL_TEST_MONGO_URI` to a local Docker MongoDB 8.0 test database.

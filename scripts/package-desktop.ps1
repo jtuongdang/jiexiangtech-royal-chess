@@ -16,7 +16,7 @@ try {
         "--type", $Type, "--input", $inputDirectory, "--dest", $Destination,
         "--name", "ChessMasterRoyal", "--app-version", $version, "--main-jar", $jar.Name,
         "--main-class", "com.jiexiangtech.chess.desktop.Main",
-        "--add-modules", "java.desktop,java.sql,java.management,java.naming,jdk.crypto.ec,jdk.unsupported",
+        "--add-modules", "java.desktop,java.net.http,java.sql,java.management,java.naming,jdk.crypto.ec,jdk.unsupported",
         "--vendor", "JIEXIANGTECH", "--copyright", "© 2026 JIEXIANGTECH. All rights reserved.",
         "--icon", "chess-desktop/src/main/resources/assets/icons/app-icon.ico"
     )

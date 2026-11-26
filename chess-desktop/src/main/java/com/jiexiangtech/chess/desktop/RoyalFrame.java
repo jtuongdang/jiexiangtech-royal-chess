@@ -32,7 +32,7 @@ final class RoyalFrame extends JFrame {
     private record LoginData(ChessStore.User user, Preferences preferences) {}
     private record ImportedFile(String raw, Pgn.Imported pgn) {}
     private record LoadedGame(MatchSnapshot snapshot, GameSession session) {}
-    private enum Page { HOME, NEW, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS }
+    private enum Page { HOME, NEW, ONLINE, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS }
 
     private static final List<String> ALL_ACHIEVEMENTS = List.of(
             "first-victory", "checkmate-master", "win-streak",
@@ -52,6 +52,7 @@ final class RoyalFrame extends JFrame {
     private MatchView match;
     private ReplayView replay;
     private PuzzleView puzzle;
+    private OnlineView online;
     private JLabel footer;
     private long generation;
     private String remembered;
@@ -85,7 +86,7 @@ final class RoyalFrame extends JFrame {
         });
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent e) {
-                if (currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView) {
+                if (currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView || currentContent instanceof OnlineView) {
                     boolean wantCompact = getWidth() < 1180;
                     if (wantCompact != sidebarCompact) {
                         sidebarCompact = wantCompact;
@@ -252,6 +253,7 @@ final class RoyalFrame extends JFrame {
         if (match != null && match != content) { match.close(); match = null; }
         if (replay != null && replay != content) { replay.close(); replay = null; }
         if (puzzle != content) puzzle = null;
+        if (online != null && online != content) { online.close(); online = null; }
         this.currentPage = selected;
         this.currentContent = content;
         this.sidebarCompact = compactSidebar;
@@ -261,7 +263,8 @@ final class RoyalFrame extends JFrame {
 
     private void mountShell() {
         boolean focusActive = currentContent instanceof MatchView mv && mv.isFocusMode();
-        boolean cinematicBackdrop = currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView;
+        boolean cinematicBackdrop = currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView
+                || currentContent instanceof OnlineView;
         String bgPath = focusActive ? BrandingManager.FOCUS_BG : cinematicBackdrop ? BrandingManager.GAMEPLAY_BG : null;
         JPanel root = new RoyalBackgroundPanel(new BorderLayout(),
                 bgPath == null ? null : assets.brand(bgPath), 0, false);
@@ -303,6 +306,7 @@ final class RoyalFrame extends JFrame {
         List<RoyalNavigationPanel.Item> items = List.of(
                 new RoyalNavigationPanel.Item(Page.HOME.name(), t("home"), RoyalIcons.Glyph.HOME, () -> navigate(this::dashboard)),
                 new RoyalNavigationPanel.Item(Page.NEW.name(), t("newGame"), RoyalIcons.Glyph.PLUS, () -> navigate(() -> newGame(MatchOptions.Mode.LOCAL))),
+                new RoyalNavigationPanel.Item(Page.ONLINE.name(), t("online"), RoyalIcons.Glyph.PLAY, () -> navigate(this::online)),
                 new RoyalNavigationPanel.Item(Page.PUZZLES.name(), t("puzzles"), RoyalIcons.Glyph.PUZZLES, () -> navigate(this::puzzleList)),
                 new RoyalNavigationPanel.Item(Page.HISTORY.name(), t("history"), RoyalIcons.Glyph.HISTORY, () -> navigate(this::history)),
                 new RoyalNavigationPanel.Item(Page.LEADERBOARD.name(), t("leaderboard"), RoyalIcons.Glyph.LEADERBOARD, () -> navigate(this::leaderboard)),
@@ -315,7 +319,15 @@ final class RoyalFrame extends JFrame {
                 this::toggleSidebar, this::about, () -> navigate(this::signOut));
     }
 
+    private void online() {
+        if (online != null) return;
+        OnlineView view = new OnlineView(this, user.id());
+        show(Page.ONLINE, view, getWidth() < 1180);
+        online = view;
+    }
+
     private void signOut() {
+        if (online != null) { online.close(); online = null; }
         if (match != null) { match.close(); match = null; }
         if (replay != null) { replay.close(); replay = null; }
         puzzle = null;
@@ -1522,6 +1534,7 @@ final class RoyalFrame extends JFrame {
 
     private void shutdown() {
         closing = true;
+        if (online != null) online.close();
         generation++;
         if (match != null) match.close();
         if (replay != null) replay.close();

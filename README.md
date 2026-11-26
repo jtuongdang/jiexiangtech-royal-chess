@@ -6,13 +6,15 @@
 
 # ChessMaster – Royal Edition
 
-ChessMaster is an offline desktop chess game developed by **JIEXIANGTECH (杰祥科技)**.
+ChessMaster is a desktop chess game developed by **JIEXIANGTECH (杰祥科技)**.
 Play on a marble board with the supplied Royal Luxury pieces, switch between English and Vietnamese,
 and keep games, preferences and puzzle progress in a local SQLite database.
 
 ![Official ChessMaster Royal Edition banner](chess-desktop/src/main/resources/assets/backgrounds/splash-background.png)
 
 ## Play
+
+- **Play online** opens the invite-only 1v1 beta when a server is configured. The [online deployment guide](docs/ONLINE_DEPLOYMENT.md) covers local testing, MongoDB Atlas and Render.
 
 - Play with two people on one computer or face four AI levels. Choose sides, a time control and increment.
 - Move by clicking or dragging. The board shows legal destinations, the last move and check. Choose a piece when promoting.
@@ -63,11 +65,11 @@ On macOS, [build.sh](scripts/build.sh) and [run.sh](scripts/run.sh) select the i
 
 The Windows packaging script accepts `-Type msi` on a host with the JDK’s required installer tooling. The Linux script also accepts `deb` or `rpm` on a host with the corresponding package tools. Local macOS images are developer builds without Apple notarization.
 
-In IntelliJ IDEA, open the root `pom.xml` as a Maven project, select JDK 17, let IntelliJ import all four modules, then run `com.jiexiangtech.chess.desktop.Main` with the `chess-desktop` module classpath.
+In IntelliJ IDEA, open the root `pom.xml` as a Maven project, select JDK 17, let IntelliJ import the Maven modules, then run `com.jiexiangtech.chess.desktop.Main` with the `chess-desktop` module classpath.
 
 ## Technology and architecture
 
-Java 17, Swing, Java2D and FlatLaf provide the desktop interface. Maven coordinates the four modules. SQLite JDBC handles local storage, SLF4J and Logback provide logging, and JUnit 5 with Mockito covers unit and integration behavior. Maven coordinates are `com.jiexiangtech:royal-chess`, and Java packages start with `com.jiexiangtech.chess`.
+Java 17, Swing, Java2D and FlatLaf provide the desktop interface. Maven coordinates the desktop and online server modules. SQLite JDBC handles local storage, SLF4J and Logback provide logging, and JUnit 5 with Mockito covers unit and integration behavior. Maven coordinates are `com.jiexiangtech:royal-chess`, and Java packages start with `com.jiexiangtech.chess`.
 
 ```mermaid
 flowchart LR
@@ -86,6 +88,8 @@ flowchart LR
 ├── chess-application     Accounts, game sessions, puzzles and ports
 ├── chess-infrastructure  SQLite migrations, hashing and AI implementations
 ├── chess-desktop         Swing UI, branding, localization and runtime assets
+├── chess-online-protocol Online room, command and snapshot DTOs
+├── chess-server          Online rooms, clocks, WebSocket and MongoDB
 ├── scripts               Build, launch, package and asset preparation
 ├── docs                  Requirements, architecture, schema and verification
 └── .github/workflows     CI and tag-based releases

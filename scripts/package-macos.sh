@@ -30,7 +30,7 @@ mkdir -p "$output"
 "$JAVA_HOME/bin/jpackage" --type "$type" --input "$input" --dest "$output" \
     --name 'ChessMaster Royal' --app-version "$version" --main-jar "$name" \
     --main-class com.jiexiangtech.chess.desktop.Main \
-    --add-modules java.desktop,java.sql,java.management,java.naming,jdk.crypto.ec,jdk.unsupported \
+    --add-modules java.desktop,java.net.http,java.sql,java.management,java.naming,jdk.crypto.ec,jdk.unsupported \
     --vendor JIEXIANGTECH --copyright '© 2026 JIEXIANGTECH. All rights reserved.' \
     --mac-package-name ChessMaster --mac-package-identifier com.jiexiangtech.chess \
     --icon chess-desktop/src/main/resources/assets/icons/app-icon.icns "$@"

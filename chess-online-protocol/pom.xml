@@ -1,0 +1,8 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>com.jiexiangtech</groupId><artifactId>royal-chess</artifactId><version>1.0.0</version></parent>
+  <artifactId>chess-online-protocol</artifactId>
+  <dependencies>
+    <dependency><groupId>com.jiexiangtech</groupId><artifactId>chess-domain</artifactId><version>${project.version}</version></dependency>
+  </dependencies>
+</project>
