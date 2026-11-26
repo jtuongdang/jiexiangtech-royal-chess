@@ -44,3 +44,9 @@ Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and
   puzzles, and `perft(3)=8902` verification.
 
 The online test run set `ROYAL_TEST_MONGO_URI` to a local Docker MongoDB 8.0 test database.
+
+The `linux/amd64` container for commit `834ff84` used the verified Maven JAR and ran with a
+512 MiB memory limit. Its health response reported the expected commit, and the container
+passed an invite, join, legal-move, duplicate-command and resynchronization check against
+MongoDB. The Docker Hub push and subsequent manifest lookup returned the same
+[image digest](ONLINE_DEPLOYMENT.md#deploy-the-private-image).

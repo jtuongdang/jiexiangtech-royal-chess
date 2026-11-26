@@ -12,7 +12,8 @@
 - Use ChessMaster – Royal Edition and JIEXIANGTECH (杰祥科技). Centralize runtime identity in BrandConstants and BrandingManager.
 - Keep the Maven reactor at com.jiexiangtech:royal-chess and Java packages at com.jiexiangtech.chess.
 - Preserve originals under branding and raw-assets. Commit processed assets and documented application screenshots. Generate branding variants with scripts/PrepareBranding.java after board assets when updating the manifest.
-- Use the private jiexiangtech-royal-chess repository and verify the remote before pushing. Preserve Git history and never force-push.
+- Keep the existing `jtuongdang/jiexiangtech-royal-chess` GitHub repository public so desktop releases remain downloadable. Verify the remote before pushing. Preserve Git history and never force-push.
+- Keep the Docker Hub server repository private. Run the online server and MongoDB integration test before publishing a server image. Keep Atlas connection strings, organizer keys and deployment credentials in service secret settings.
 - Record real build, platform, launcher and CI results. Only publish version tags whose CI matrix has verified the artifacts.
 - Keep Stockfish external to application packages. Retain third-party notices with distributed files.
 

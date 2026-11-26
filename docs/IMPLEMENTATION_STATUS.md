@@ -25,7 +25,7 @@ approved Splash/Login baseline and both official visual references.
 
 ## Remaining scope
 
-- Render and Atlas cloud setup require account access. The private Docker Hub server repository and release workflow are ready. Cloud accounts and rated matchmaking are later phases.
+- The verified beta server image has been published to the private Docker Hub repository. Render and Atlas setup require signed-in accounts. GitHub Actions image publishing requires its own Docker Hub write credential. Cloud accounts and rated matchmaking are later phases.
 - General dead-position and flag-fall adjudication still lack a complete reachability solver for unusual positions.
 - The replay import supports one PGN main line per file and is session-local. The history view filters local results without pagination.
 - Four verified puzzles currently cover mate in one. Multi-move puzzles are outside this release.

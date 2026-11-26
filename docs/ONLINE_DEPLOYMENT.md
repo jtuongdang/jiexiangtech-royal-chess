@@ -39,6 +39,12 @@ and keep its data, use `docker compose down`. Use a distinct key for a hosted be
 The verified repository is [jtuongdev/jiexiangtech-royal-chess-server](https://hub.docker.com/r/jtuongdev/jiexiangtech-royal-chess-server).
 The image runs a Java 21 runtime on `linux/amd64`. The bundled desktop app uses Java 17.
 
+The published beta image for commit `834ff84` is:
+
+```text
+docker.io/jtuongdev/jiexiangtech-royal-chess-server@sha256:66c63b4c96a9c6e8f8bde42204ad187bee227884be25cc6de51165791a1ac266
+```
+
 1. In Atlas, create a **Free** cluster for the beta and a database user with read/write
    privileges for the selected database. Use Singapore if available for the desired tier.
    Put the database name in the Atlas URI, such as `royal_beta`, so the service selects it.
