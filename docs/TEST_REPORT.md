@@ -50,3 +50,12 @@ The `linux/amd64` container for commit `834ff84` used the verified Maven JAR and
 passed an invite, join, legal-move, duplicate-command and resynchronization check against
 MongoDB. The Docker Hub push and subsequent manifest lookup returned the same
 [image digest](ONLINE_DEPLOYMENT.md#deploy-the-private-image).
+
+The November 26 cloud deployment passed the public `/health` check for `834ff84` against
+MongoDB Atlas. Two instances of the desktop network client verified organizer authorization,
+room creation and join, two legal moves over HTTPS, notifications over WSS, idempotent retry,
+resynchronization after disconnect and a persisted resignation result.
+
+[GitHub Actions for the deployed revision](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45824365829)
+passed on Linux and Windows, and the live MongoDB integration job passed. The hosted macOS
+job was cancelled. The local macOS Maven reactor and desktop smoke test passed.

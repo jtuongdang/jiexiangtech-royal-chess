@@ -20,19 +20,20 @@ approved Splash/Login baseline and both official visual references.
 | Persistence | SQLite migration, PBKDF2, per-profile data, atomic snapshots, safe rollback and replay-based restore |
 | AI | Four levels, time limits, cancellation, analysis and optional external Stockfish validated with Stockfish 19 |
 | Desktop verification | Maven passed all 29 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
-| Online beta | Desktop invite rooms and server-authoritative moves, clocks and outcomes implemented. HTTP, WebSocket and MongoDB reconnect/restart verified locally |
-| GitHub | Private repository at `jtuongdang/jiexiangtech-royal-chess` |
+| Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two desktop clients verified invitation, moves, reconnect and match result over HTTPS/WebSocket |
+| GitHub | Public repository at `jtuongdang/jiexiangtech-royal-chess` |
 
 ## Remaining scope
 
-- The verified beta server image has been published to the private Docker Hub repository. Render and Atlas setup require signed-in accounts. GitHub Actions image publishing requires its own Docker Hub write credential. Cloud accounts and rated matchmaking are later phases.
+- The live beta uses a private Docker Hub image. Its Render pull credential expires on February 24, 2027. Automated GitHub Actions publishing still requires a separate write credential. Cloud accounts and rated matchmaking are later phases.
+- Atlas project cleanup remains. The earlier unused `chessmaster_render` database user and the IP entry created by Atlas Auto Setup remain in the project. The service uses `royal_beta_render` and the Render Singapore outbound range.
 - General dead-position and flag-fall adjudication still lack a complete reachability solver for unusual positions.
 - The replay import supports one PGN main line per file and is session-local. The history view filters local results without pagination.
 - Four verified puzzles currently cover mate in one. Multi-move puzzles are outside this release.
 - Native release signing and notarization require developer signing resources. The checkout provides packaging scripts and local macOS app image support.
 - Reference design spec and verified comparison screenshots are tracked in `docs/design/` and `docs/screenshots/`.
 
-[Royal Focus Mode Spec](design/ROYAL_FOCUS_MODE.md) · [Architecture](ARCHITECTURE.md) · [Test report](TEST_REPORT.md) · [Design system](DESIGN_SYSTEM.md) · [Private repository](https://github.com/jtuongdang/jiexiangtech-royal-chess)
+[Royal Focus Mode Spec](design/ROYAL_FOCUS_MODE.md) · [Architecture](ARCHITECTURE.md) · [Test report](TEST_REPORT.md) · [Design system](DESIGN_SYSTEM.md) · [GitHub repository](https://github.com/jtuongdang/jiexiangtech-royal-chess)
 
 [Classic board geometry and comparison](design/ROYAL_CLASSIC_BOARD.md)
 

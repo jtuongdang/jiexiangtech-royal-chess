@@ -11,6 +11,16 @@ chess domain for legality, mate, timeouts and draws. Client-side settings and of
 use SQLite. Cloud accounts, rated matchmaking, online game-history search and hosted analysis
 remain future work.
 
+## Connect to the hosted beta
+
+Enter `https://jiexiangtech-royal-chess.onrender.com` in **Play online**. The organizer
+retrieves `CHESS_BETA_KEY` from the Render service's **Environment** settings. Share the
+server URL and room code with the second player. The first connection after an idle period
+may need about a minute while the Render Free instance wakes up.
+
+[Server health](https://jiexiangtech-royal-chess.onrender.com/health) ·
+[Render Free behavior](https://render.com/docs/free#spinning-down-on-idle)
+
 ## Run a local room
 
 From the repository root, with Docker running:
