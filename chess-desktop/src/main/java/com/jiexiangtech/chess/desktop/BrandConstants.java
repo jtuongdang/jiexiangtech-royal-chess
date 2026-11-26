@@ -12,6 +12,6 @@ final class BrandConstants {
 
     static String version() {
         String version = Main.class.getPackage().getImplementationVersion();
-        return version == null ? "1.1.0" : version;
+        return version == null ? "1.2.0" : version;
     }
 }

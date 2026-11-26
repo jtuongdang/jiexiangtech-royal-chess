@@ -72,3 +72,11 @@ passed Linux and Windows verification, MongoDB integration, Linux and Windows na
 checks, and the Apple Silicon DMG and ZIP payload and architecture checks. The Mac launcher
 ran on the local Apple Silicon machine. The workflow published the packages and SHA-256
 checksums in [v1.1.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.1.0).
+
+For desktop v1.2.0 (Online UI/UX upgrade: tabbed Create/Join lobby, collapsible wide server
+settings, cold-start notice, waiting invite banner, player names & low-time warning on clocks,
+move/result audio cues, and RoyalDialog match-outcome modal with Back-to-Lobby), `mvn -B -ntp clean verify`
+passed all 7 modules (Domain 14, Application 3, Infrastructure 6, Desktop 8, Server unit tests;
+0 failures, 0 errors). The rebuilt `royal-chess-1.2.0-all.jar` passed `--smoke` (`perft(3)=8902`),
+and `scripts/package-macos.sh dist dmg` produced `dist/royal-chess-macos-arm64-1.2.0.dmg` (64 MB)
+verified with `hdiutil verify` (`VALID`).

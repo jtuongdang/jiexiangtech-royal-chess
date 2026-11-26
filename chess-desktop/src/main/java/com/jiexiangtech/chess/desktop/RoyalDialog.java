@@ -82,6 +82,45 @@ final class RoyalDialog extends JDialog {
         dialog.setVisible(true);
     }
 
+    static boolean onlineOutcome(Component parent, String heading, String resultLabel, String reasonLabel,
+                                 String playersLine, String movesLine, Color accent,
+                                 String reviewLabel, String lobbyLabel) {
+        AtomicReference<Boolean> goLobby = new AtomicReference<>(false);
+        Window owner = SwingUtilities.getWindowAncestor(parent);
+        RoyalDialog dialog = new RoyalDialog(owner, heading);
+
+        JLabel badge = pill(reasonLabel, new Color(20, 18, 22, 220),
+                new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 150), accent);
+        JLabel hero = title(resultLabel, 34);
+        hero.setForeground(accent);
+        JLabel players = label(playersLine, IVORY);
+        players.setFont(sans(Font.PLAIN, 14f));
+        JLabel moves = label(movesLine, MUTED);
+        moves.setFont(sans(Font.PLAIN, 13f));
+
+        JPanel body = transparent(null);
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        for (JComponent c : new JComponent[]{badge, hero, players, moves}) c.setAlignmentX(Component.LEFT_ALIGNMENT);
+        body.add(badge);
+        body.add(Box.createVerticalStrut(10));
+        body.add(hero);
+        body.add(Box.createVerticalStrut(10));
+        body.add(players);
+        body.add(Box.createVerticalStrut(4));
+        body.add(moves);
+        body.setPreferredSize(new Dimension(360, body.getPreferredSize().height + 6));
+
+        JPanel buttons = transparent(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        buttons.add(new RoyalButton(reviewLabel, RoyalButton.Variant.SECONDARY, null, dialog::dispose));
+        buttons.add(new RoyalButton(lobbyLabel, RoyalButton.Variant.PRIMARY, null, () -> {
+            goLobby.set(true);
+            dialog.dispose();
+        }));
+        dialog.buildShell(heading, body, buttons);
+        dialog.setVisible(true);
+        return Boolean.TRUE.equals(goLobby.get());
+    }
+
     static String choose(Component parent, String title, String subtitle, List<String> options, String cancelLabel) {
         AtomicReference<String> picked = new AtomicReference<>();
         Window owner = SwingUtilities.getWindowAncestor(parent);

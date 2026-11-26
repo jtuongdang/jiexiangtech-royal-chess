@@ -21,7 +21,7 @@ approved Splash/Login baseline and both official visual references.
 | AI | Four levels, time limits, cancellation, analysis and optional external Stockfish validated with Stockfish 19 |
 | Piece motion | Classic and Focus share time-based easing, drag settling and capture/castling/promotion transitions. The Ultra setting requests an 8 ms repaint interval during moves |
 | Desktop verification | Maven passed all 37 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
-| Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two desktop clients verified invitation, moves, reconnect and match result over HTTPS/WebSocket |
+| Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two live matches verified over HTTPS/WebSocket. Desktop v1.2.0 upgrades the Online UX with tabbed Create/Join lobby, collapsible server settings, cold-start feedback, prominent waiting invite banner, visible player names & low-time clock warning, move/result audio cues, and a match-outcome dialog with Back-to-Lobby |
 | GitHub | Public repository at `jtuongdang/jiexiangtech-royal-chess` |
 
 ## Remaining scope
