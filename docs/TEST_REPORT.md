@@ -37,4 +37,7 @@ Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and
 - The refreshed [Royal Focus capture](screenshots/royal-focus-actual.png) at 1280 × 720 and
   [comparison](screenshots/royal-focus-comparison.png) show the new chess sprites and marble
   under the established 2.5D camera. Geometry round-trip and click-to-move tests pass.
-- This art update was verified with the Java 17 JAR. Native distribution packaging was not run.
+- Native macOS packaging (`scripts/package-macos.sh`) succeeded with OpenJDK 17 `jpackage`,
+  producing `dist/app/ChessMaster Royal.app` and `dist/ChessMaster Royal-1.0.0.dmg` (58 MB).
+  The packaged native launcher (`ChessMaster Royal --smoke`) passed assets, SQLite migrations/profile,
+  puzzles, and `perft(3)=8902` verification.
