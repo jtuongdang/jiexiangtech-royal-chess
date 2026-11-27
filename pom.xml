@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.jiexiangtech</groupId><artifactId>royal-chess</artifactId><version>1.2.0</version>
+  <groupId>com.jiexiangtech</groupId><artifactId>royal-chess</artifactId><version>1.3.0</version>
   <packaging>pom</packaging>
   <name>ChessMaster – Royal Edition</name>
   <description>Offline desktop chess developed by JIEXIANGTECH (杰祥科技)</description>
