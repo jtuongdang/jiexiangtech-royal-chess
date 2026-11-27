@@ -24,8 +24,19 @@ The built desktop JAR passed its launcher smoke check, including `perft(3)=8902`
 passed Linux, macOS and Windows verification plus the MongoDB and reconnect job for
 `6f54d79`. The `linux/amd64` image ran with a 512 MiB memory limit and passed its
 revision, legacy snapshot, two-seat avatar and legal move checks. Its manifest digest
-was verified after the private Docker Hub push. No new native desktop package was verified
-for this change.
+was verified after the private Docker Hub push.
+
+### Desktop v1.3.0
+
+The release commit `1123d7a` passed all 39 tests locally with MongoDB. [Main CI](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45929639873)
+passed on macOS, Windows and Linux, including the MongoDB and reconnect job.
+The Apple Silicon DMG passed `hdiutil verify` and the launcher passed `--smoke` from the mounted image.
+The extracted ZIP also passed the launcher smoke check. The native app image captured the Royal Arena
+board and avatar picker. All 2,638 JAR entries from the locally packaged app matched the Linux CI JAR.
+The [release workflow](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45929725556)
+verified the staged Mac packages and ran the Linux and Windows native launchers before publishing
+the DMG, ZIPs, Linux archive, portable JAR and checksums in [v1.3.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.3.0).
+The first release attempt hit an HTTP 429 from Maven Central. The retry passed.
 
 ## Earlier releases · November 26, 2026
 

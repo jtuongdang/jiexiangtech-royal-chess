@@ -23,12 +23,14 @@ approved Splash/Login baseline and both official visual references.
 | Royal Arena | Castle backdrop, player portraits and clocks around a VS header, revised perspective, 12 ivory and onyx sprites, and eight marble variants for Classic and Focus. Both modes still use the live match position |
 | Avatars | Settings provides six portraits and the Royal emblem. SQLite stores the selection per profile. The updated online server stores the portrait preset ID on each seat and returns it to clients that support portraits |
 | Desktop verification | Maven passed all 39 tests, including the MongoDB integration suite. Live macOS Swing captures cover Classic, Royal Arena and the avatar picker |
+| Desktop release | [v1.3.0](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/tag/v1.3.0) ships Royal Arena for Apple Silicon macOS, Windows x64 and Linux x64, with a portable Java 17 JAR and checksums |
 | Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two live matches verified over HTTPS/WebSocket. Desktop v1.2.0 upgrades the Online UX with tabbed Create/Join lobby, collapsible server settings, cold-start feedback, prominent waiting invite banner, visible player names & low-time clock warning, move/result audio cues, and a match-outcome dialog with Back-to-Lobby |
 | GitHub | Public repository at `jtuongdang/jiexiangtech-royal-chess` |
 
 ## Remaining scope
 
 - Battle Map campaign progression, unlocks and rewards are a separate feature phase.
+- The Royal Arena server image is available in the private registry. Deploying it to the existing Render service requires an authenticated dashboard session.
 - The live beta uses a private Docker Hub image. Its Render pull credential expires on February 24, 2027. Automated GitHub Actions publishing still requires a separate write credential. Cloud accounts and rated matchmaking are later phases.
 - Atlas project cleanup remains. The earlier unused `chessmaster_render` database user and the IP entry created by Atlas Auto Setup remain in the project. The service uses `royal_beta_render` and the Render Singapore outbound range.
 - General dead-position and flag-fall adjudication still lack a complete reachability solver for unusual positions.
