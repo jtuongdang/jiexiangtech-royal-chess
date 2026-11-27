@@ -20,6 +20,13 @@ and [the avatar picker](screenshots/royal-arena-avatars.png). The [live comparis
 pairs the actual Focus capture with the supplied design.
 The built desktop JAR passed its launcher smoke check, including `perft(3)=8902`.
 
+[GitHub Actions](https://github.com/jtuongdang/jiexiangtech-royal-chess/actions/runs/45929018725)
+passed Linux, macOS and Windows verification plus the MongoDB and reconnect job for
+`6f54d79`. The `linux/amd64` image ran with a 512 MiB memory limit and passed its
+revision, legacy snapshot, two-seat avatar and legal move checks. Its manifest digest
+was verified after the private Docker Hub push. No new native desktop package was verified
+for this change.
+
 ## Earlier releases · November 26, 2026
 
 Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and Maven.

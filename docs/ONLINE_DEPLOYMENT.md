@@ -59,6 +59,12 @@ The published beta image for commit `834ff84` is:
 docker.io/jtuongdev/jiexiangtech-royal-chess-server@sha256:66c63b4c96a9c6e8f8bde42204ad187bee227884be25cc6de51165791a1ac266
 ```
 
+The tested Royal Arena image for commit `6f54d79` is available in the same private repository:
+
+```text
+docker.io/jtuongdev/jiexiangtech-royal-chess-server@sha256:803da8088d27710f712b35036e82154dae50a727b501fa5c3ac087a669ad1157
+```
+
 1. In Atlas, create a **Free** cluster for the beta and a database user with read/write
    privileges for the selected database. Use Singapore if available for the desired tier.
    Put the database name in the Atlas URI, such as `royal_beta`, so the service selects it.
