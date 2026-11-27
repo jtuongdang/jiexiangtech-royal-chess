@@ -1,31 +1,41 @@
-# Royal Luxury assets
+# Royal Arena and Royal Luxury assets
 
 Target paths are relative to assets/themes/royal. Original assets are preserved locally in
 raw-assets. The current 12 sprites come from a transparent ImageGen atlas based on
-Chessmaster Royal Edition Interface-2.png. Each is isolated, proportionally resampled and
+the original Royal Arena Duel design. Each is isolated, proportionally resampled and
 bottom-centered on a transparent 512 × 512 canvas. The grid and pieces are drawn separately
-at runtime. Classic uses the carved frame and marble from the top-down reference.
+at runtime. Classic uses the carved frame from the original top-down reference.
 
 | Source | Target | Source → output | Processing |
 | --- | --- | --- | --- |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/rook.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/1 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/knight.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/2 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/bishop.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/3 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/queen.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/4 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/king.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/5 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/black/pawn.png` | 2172 × 724 → 512 × 512 | Atlas cell 1/6 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/rook.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/1 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/knight.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/2 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/bishop.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/3 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/queen.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/4 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/king.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/5 |
-| `raw-assets/royal-classic-sprites.png` | `pieces/white/pawn.png` | 2172 × 724 → 512 × 512 | Atlas cell 2/6 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/rook.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/1 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/knight.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/2 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/bishop.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/3 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/queen.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/4 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/king.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/5 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/black/pawn.png` | 1536 × 1024 → 512 × 512 | Atlas cell 1/6 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/rook.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/1 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/knight.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/2 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/bishop.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/3 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/queen.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/4 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/king.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/5 |
+| `raw-assets/royal-arena-sprites.png` | `pieces/white/pawn.png` | 1536 × 1024 → 512 × 512 | Atlas cell 2/6 |
 | `raw-assets/royal-interface-2.png` | `board/classic-frame.png` | 1586 × 992 → 828 × 842 | Bezel only. Baked coordinate glyphs removed. Playing area is transparent. |
-| `raw-assets/royal-interface-2.png` | `board/tile-light*.png, board/tile-dark*.png` | 1586 × 992 → 8 × (256 × 256) | Four unoccupied marble samples of each shade |
+| `raw-assets/royal-arena-marble.png` | `board/tile-light*.png, board/tile-dark*.png` | 1774 × 887 → 8 × (256 × 256) | Four cream marble and four dark onyx samples |
 | `raw-assets/royal_chessboard.png` | `board/board.png` | 2048 × 2048 | Legacy decorative artwork retained |
 | `raw-assets/royal_chessboard_grid.png` | `board/board-grid.png` | 1920 × 1920 | Legacy decorative artwork retained |
 
 The original individual sprites, marble tiles and composite sheets are still in raw-assets.
+
+## Arena scene and portraits
+
+Targets in this section are relative to assets, except for the design reference.
+
+| Source | Target | Source → output | Processing |
+| --- | --- | --- | --- |
+| `raw-assets/royal-arena-backdrop.png` | `backgrounds/royal-arena.jpg` | 1672 × 941 | Backdrop without board, pieces or UI, encoded as JPEG |
+| `raw-assets/royal-arena-portraits.png` | `avatars/{knight,queen,sage,archer,sovereign,ranger}.png` | 1254 × 1254 → 6 × (256 × 256) | Center-cropped portraits, circular masks drawn by Swing |
+| `raw-assets/royal-arena-duel-reference.png` | `docs/design/royal-focus-reference.png` | 1672 × 941 → 1024 × 576 | Owner-provided layout reference, not a runtime image |
 
 ## Corporate branding
 

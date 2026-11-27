@@ -1,71 +1,46 @@
-# Royal Focus Mode 2.5D — Strict Design & Geometry Specification
+# Royal Arena · Royal Focus 2.5D
 
-Reference image: [royal-focus-reference.png](royal-focus-reference.png) (`1024 × 576`, exact `16:9` aspect ratio).
+[Arena Duel reference](royal-focus-reference.png) · [Live Swing capture](../screenshots/royal-focus-actual.png) · [Side-by-side comparison](../screenshots/royal-focus-comparison.png)
 
-## 1. Measured Normalized Layout Coordinates
+The player portraits, live clocks and VS mark sit above a perspective board. The castle scenery
+is a separate background, with the toolbar below the board and a collapsible move history and
+captured pieces drawer. Classic 2D retains its square grid and carved frame. Both modes use the
+same ivory and onyx pieces with gold trim, and the same eight marble samples.
 
-All coordinates below were measured directly from `royal-focus-reference.png` (`W = 1024`, `H = 576`) so the Java Swing presentation layer scales proportionally across `1280×800`, `1440×900`, `1920×1080`, `2560×1600`, and minimum window sizes.
+## Board geometry and rendering
 
-| Region | Reference Pixels (`x, y, w, h`) | Normalized Ratio (`W`, `H`) | Notes |
-| --- | --- | --- | --- |
-| Left Sidebar | `0, 0, 133, 576` | `0.000, 0.000, 0.130, 1.000` | Dark obsidian panel, luminous gold right edge at `x = 0.130W`, ChessMaster logo top, 9 gold-icon nav items, decorative black-gold Knight bottom, auto-dims during active focus and brightens on mouse hover |
-| Gameplay Stage | `133, 0, 891, 576` | `0.130, 0.000, 0.870, 1.000` | Centered spotlighted chess room (`royal-focus-background.png`), deep corner vignette |
-| Top Corporate Brand | Centered above stage (`y = 8..42`) | `y = 0.014..0.073` | Horizontal `JIEXIANGTECH 杰祥科技` lockup (`company-horizontal.png`) |
-| Top Game Wordmark | Centered below corporate mark (`y = 48..112`) | `y = 0.083..0.194` | Crown + `CHESSMASTER / ROYAL EDITION` emblem |
-| Black Player Card | Stage top-left (`y = 58..110`) | `x_stage = 0.02..0.33, y = 0.10..0.19` | Circular royal portrait ring, name, `AI`/`Local` badge, real Elo, dark recessed clock |
-| White Player Card | Stage top-right (`y = 58..110`) | `x_stage = 0.67..0.98, y = 0.10..0.19` | Active player gets metallic gold glow border, warm horizontal gradient, left crown indicator, green turn dot, illuminated gold clock |
-| 2.5D Outer Frame (Top Edge) | `x = 315..781, y = 178` | `width = 0.524 × W_stage, y = 0.309H` | Far edge of beveled metallic gold frame |
-| 2.5D Outer Frame (Front Lip) | `x = 174..921, y = 476` | `width = 0.840 × W_stage, y = 0.826H` | Near edge of tabletop surface (`taper = 0.623`) |
-| 2.5D Board Front Slab | `y = 476..508` | `thickness = 0.056H` | Dark marble vertical front face with metallic gold rails and sculpted central royal crown & laurel emblem |
-| Bottom Horizontal Toolbar | Centered below board (`y = 524..562`) | `y = 0.910..0.976` | Single horizontal row of dark-obsidian gold-bordered pills (`Save`, `Undo`, `Hint`, `Draw`, `Resign`, `Flip Board`, `Sound`, `Full Screen`, plus toggleable Move History/Captured drawer & 2D/2.5D mode switch) |
+| Measurement | Relative to board viewport |
+| --- | --- |
+| Far-to-near frame width | 0.74 |
+| Near frame width | Up to 87.5% of viewport width |
+| Tabletop height | Up to 76% of viewport height |
+| Front slab | 9% of tabletop height, with a 16 px minimum |
+| Playing grid | 8 × 8, with projection from a square board plane |
 
-## 2. Perspective Projection & Homography Math
+`PerspectiveCoordinateMapper` fits the geometry and shares the homography with mouse
+hit testing. It uses the current board orientation when mapping ranks and files.
+`PerspectiveTextureRenderer` caches the warped 64-square surface. `RoyalPieceRenderer`
+draws the 12 Retina-ready sprites upright with depth-dependent scale. Board highlights,
+shadows, reflections and glows are rendered from match state. Players can switch views
+during a match, and SQLite stores the view mode and graphics quality per desktop profile.
 
-- The playing grid occupies canonical board coordinates `(u, v) ∈ [0, 1] × [0, 1]`, where `u = col / 8` (left to right) and `v = row / 8` (far rank to near rank).
-- The outer ornate frame extends to `[-0.078, 1.078]` horizontally and `[-0.048, 1.110]` vertically (giving clean foreshortened side rank channels `1–8` and front file channel `A–H`).
-- `PerspectiveProjection` solves the exact `3×3` projective homography matrix `H` mapping the 4 canonical corners `(0,0), (1,0), (1,1), (0,1)` onto the 4 screen-space trapezoid corners `(TL, TR, BR, BL)` via Gaussian elimination, and precomputes `H⁻¹` for exact inverse mouse hit-testing (`PerspectiveCoordinateMapper`).
-- **True Depth Foreshortening**: Because `H` is projective (`x' = (h00 u + h01 v + h02)/w`, `y' = (h10 u + h11 v + h12)/w`), near ranks are naturally ~1.6× deeper vertically and ~1.6× wider horizontally than far ranks, converging smoothly toward the camera vanishing point.
-- **Texture Warping**: `PerspectiveTextureRenderer` caches the warped 64-tile marble board surface into an offscreen Retina-scaled `BufferedImage` whenever geometry, theme, or quality changes, using per-pixel inverse homography lookup into `tile-light.png` and `tile-dark.png` (zero per-frame allocation, 60 FPS rendering!).
-- **2.5D Billboard Pieces**: `PieceDepthSorter` sorts all pieces back-to-front (`row = 0 → 7`) so near pieces naturally overlap far pieces. Each piece stands upright on its square's projected anchor `(cx, baseY)`, scaled proportionally by local square width `localScale(row)` with contact shadows, directional light shadows, and subtle surface reflections (`ShadowRenderer`, `ReflectionRenderer`).
+Each move eases between square anchors. A dragged piece settles from its release point,
+captured pieces fade near arrival, castling animates both pieces, and promotion changes the
+sprite on landing. Ultra requests an 8 ms repaint interval while a piece is moving.
 
-## 3. Lighting, Palette & Focus Behavior
+## Portraits and source artwork
 
-- **Palette**: Obsidian `#0B0B0D`, surface `#141316`, metallic gold `#F6DE98 / #D4AF37 / #8A651D`, warm spotlight `rgba(242, 198, 86, 0.25)`, luminous selected square `#FFF4BE`, sage-gold legal target disc `#A8C958`.
-- **Cinematic Lighting Pipeline** (`CinematicLightingEngine`):
-  1. Darkened moody chess hall backdrop (`royal-focus-background.png`).
-  2. Warm golden radial spotlight (`SpotlightRenderer`) centered over the 2.5D board.
-  3. Subtle board-surface piece reflections (`ReflectionRenderer`, clipped to the 8×8 trapezoid!).
-  4. Grounded contact + directional cast shadows (`ShadowRenderer`).
-  5. Soft corner vignette (`VignetteRenderer`) focusing visual attention squarely on the board without obscuring clocks or buttons.
-- **Focus Mode Auto-Dim**: During Royal Focus 2.5D, the Sidebar and Bottom Toolbar gently dim (`alpha = 0.68`) when the pointer is on the board and smoothly restore to full brightness (`alpha = 1.0`) when hovered!
-- **Live Mode Switching**: Players can toggle seamlessly between **Classic 2D** and **Royal Focus 2.5D** mid-game without losing state, clocks, or move history; preference and `GraphicsQuality` (`LOW`, `MEDIUM`, `HIGH`, `ULTRA`) persist to SQLite.
+Settings offers six portraits and the Royal emblem. The desktop stores the selection per
+profile and sends its preset ID when creating or joining an online room. The server stores
+that ID on the seat. Each portrait is rendered from a packaged asset.
 
+[Arena avatar picker](../screenshots/royal-arena-avatars.png) · [Asset manifest](../ASSET_MANIFEST.md)
 
-## 4. Calibrated 1:1 Verification Metrics (Reference vs. Live Swing Actual)
+The supplied Arena Duel and Battle Map PNGs are preserved locally in `raw-assets`. The Arena
+Duel supplied the camera, palace balcony and material references. Battle Map remains the
+reference for a future campaign. ImageGen created four separate source images for this phase.
 
-| Metric | Reference (`1024×576`) | Calibrated Actual (`1280×720`) | Delta |
-| --- | ---: | ---: | ---: |
-| Left Sidebar right edge (`% W`) | `12.99%` | `12.81%` | `-0.18%` |
-| Board outer top edge (`% H`) | `30.90%` | `31.39%` | `+0.49%` |
-| Board front lip edge (`% H`) | `82.64%` | `82.36%` | `-0.28%` |
-| Board top-plane height (`% H`) | `51.74%` | `50.97%` | `-0.77%` |
-| Board front outer width (`% W`) | `72.75%` | `71.25%` | `-1.50%` |
-| Perspective taper (`topW / botW`) | `0.5879` | `0.5910` | `+0.0031` |
-| Frame bezel ratios (`L / R / T / B`) | `0.050 / 0.050 / 0.026 / 0.068` | `0.050 / 0.050 / 0.026 / 0.068` | `0.000` |
-
-## Sprite and marble refresh
-
-Royal Focus uses the same redrawn onyx and ivory pieces and the primary light and dark
-marble samples introduced for [Classic 2D](ROYAL_CLASSIC_BOARD.md). The original 2.5D
-reference remains the camera and geometry baseline. The projective grid, live 2D ↔ 2.5D
-toggle and SQLite preferences use the existing geometry and state.
-
-[Current live capture](../screenshots/royal-focus-actual.png) · [Focus comparison](../screenshots/royal-focus-comparison.png)
-
-## Piece motion
-
-Each move eases in and out as the piece travels between projected square anchors. Moving
-pieces are drawn in board depth order and reuse a Retina sprite while changing perspective
-size. Dragged pieces settle from the cursor release point. Captures fade near arrival,
-castling animates both pieces, and promotion changes the sprite on landing. Ultra requests
-an 8 ms repaint interval during movement. Swing coalesces requests when the system is busy.
+- Palace balcony with a distant castle at dusk, warm gold firelight and a clear floor at center for the live board.
+- A transparent 6 × 2 atlas of complete orthodox pieces, with black onyx on the top row and warm ivory below, using gold trim.
+- An overhead texture sheet with four cream marble samples and four polished onyx samples with fine gold veins.
+- A 3 × 2 portrait sheet with Knight, Queen, Sage, Archer, Sovereign and Ranger, framed as head-and-shoulders portraits.

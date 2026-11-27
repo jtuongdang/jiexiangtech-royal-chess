@@ -15,6 +15,7 @@ import javax.imageio.ImageIO;
 import com.jiexiangtech.chess.domain.Kind;
 import com.jiexiangtech.chess.domain.Piece;
 import com.jiexiangtech.chess.domain.Side;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 
 final class AssetManager {
     private static final String ROOT = "assets/themes/royal/";
@@ -45,9 +46,13 @@ final class AssetManager {
             }
         }
         for (String path : List.of(BrandingManager.SPLASH, BrandingManager.LOGIN, BrandingManager.DASHBOARD,
-                BrandingManager.GAMEPLAY_BG, BrandingManager.FOCUS_BG, BrandingManager.GAME, BrandingManager.COMPANY,
+                BrandingManager.GAMEPLAY_BG, BrandingManager.FOCUS_BG, BrandingManager.ARENA_BG,
+                BrandingManager.GAME, BrandingManager.COMPANY,
                 BrandingManager.COMPANY_HORIZONTAL, BrandingManager.EMBLEM, "branding/app-icon.png")) {
             load(path, "assets/" + path);
+        }
+        for (RoyalAvatar avatar : RoyalAvatar.values()) {
+            if (avatar != RoyalAvatar.EMBLEM) load(avatarPath(avatar), "assets/" + avatarPath(avatar));
         }
         for (String path : List.of("focus-mode/lighting/spotlight-mask.png", "focus-mode/lighting/vignette-mask.png",
                 "focus-mode/shadows/board-shadow.png", "focus-mode/textures/gold-bevel.png",
@@ -99,6 +104,8 @@ final class AssetManager {
     }
     List<String> missing() { return List.copyOf(missing); }
     BufferedImage brand(String path) { return images.get(path); }
+    BufferedImage avatar(RoyalAvatar avatar) { return images.get(avatarPath(avatar)); }
+    private static String avatarPath(RoyalAvatar avatar) { return "avatars/" + avatar.id() + ".png"; }
     BufferedImage focusAsset(String relativePath) { return images.get("focus-mode/" + relativePath); }
 
     List<Image> windowIcons() {

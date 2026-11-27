@@ -127,22 +127,29 @@ public final class Main {
                 frame.validate();
                 later(700, () -> {
                     saveImage(frame, folder, "royal-focus-actual");
-                    frame.setSize(normalSize);
-                    frame.validate();
-                    frame.visualMatch();
-                    later(600, () -> {
-                        saveImage(frame, folder, "gameplay");
-                        frame.setSize(frame.getMinimumSize());
+                    JDialog avatarPicker = frame.visualAvatarPicker();
+                    avatarPicker.setModal(false);
+                    avatarPicker.setVisible(true);
+                    later(300, () -> {
+                        saveContainer(avatarPicker.getContentPane(), folder, "royal-arena-avatars");
+                        avatarPicker.dispose();
+                        frame.setSize(normalSize);
                         frame.validate();
-                        later(300, () -> {
-                            saveImage(frame, folder, "gameplay-minimum");
-                            if (!fullQa) {
-                                frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
-                                return;
-                            }
-                            frame.setSize(normalSize);
+                        frame.visualMatch();
+                        later(600, () -> {
+                            saveImage(frame, folder, "gameplay");
+                            frame.setSize(frame.getMinimumSize());
                             frame.validate();
-                            captureExtended(frame, folder);
+                            later(300, () -> {
+                                saveImage(frame, folder, "gameplay-minimum");
+                                if (!fullQa) {
+                                    frame.dispatchEvent(new java.awt.event.WindowEvent(frame, java.awt.event.WindowEvent.WINDOW_CLOSING));
+                                    return;
+                                }
+                                frame.setSize(normalSize);
+                                frame.validate();
+                                captureExtended(frame, folder);
+                            });
                         });
                     });
                 });

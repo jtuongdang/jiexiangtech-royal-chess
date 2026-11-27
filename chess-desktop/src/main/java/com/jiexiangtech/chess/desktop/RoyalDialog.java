@@ -9,6 +9,7 @@ import javax.swing.border.EmptyBorder;
 import com.jiexiangtech.chess.domain.Kind;
 import com.jiexiangtech.chess.domain.Piece;
 import com.jiexiangtech.chess.domain.Side;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 
 final class RoyalDialog extends JDialog {
@@ -80,6 +81,37 @@ final class RoyalDialog extends JDialog {
         buttons.add(new RoyalButton(okLabel, RoyalButton.Variant.PRIMARY, null, dialog::dispose));
         dialog.buildShell(title, text, buttons);
         dialog.setVisible(true);
+    }
+
+    static JDialog avatarPicker(RoyalFrame parent, RoyalAvatar current,
+                                java.util.function.Consumer<RoyalAvatar> save) {
+        var text = parent.text();
+        String heading = text.get("avatarChoose");
+        RoyalDialog dialog = new RoyalDialog(parent, heading);
+        var selected = new AtomicReference<>(current);
+        var group = new ButtonGroup();
+        JPanel portraits = transparent(new GridLayout(0, 3, 10, 10));
+        for (RoyalAvatar avatar : RoyalAvatar.values()) {
+            JToggleButton choice = new JToggleButton(text.get("avatar." + avatar.id()),
+                    new AvatarIcon(parent.assets(), avatar, Side.WHITE, 78));
+            choice.setVerticalTextPosition(SwingConstants.BOTTOM);
+            choice.setHorizontalTextPosition(SwingConstants.CENTER);
+            choice.setMargin(new Insets(6, 8, 8, 8));
+            choice.setSelected(avatar == current);
+            choice.addActionListener(event -> selected.set(avatar));
+            group.add(choice);
+            portraits.add(choice);
+        }
+        JPanel buttons = transparent(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        buttons.add(new RoyalButton(text.get("cancel"), RoyalButton.Variant.SECONDARY, null, dialog::dispose));
+        var confirm = new RoyalButton(text.get("save"), RoyalButton.Variant.PRIMARY, null, () -> {
+            dialog.dispose();
+            save.accept(selected.get());
+        });
+        buttons.add(confirm);
+        dialog.buildShell(heading, portraits, buttons);
+        dialog.getRootPane().setDefaultButton(confirm);
+        return dialog;
     }
 
     static boolean onlineOutcome(Component parent, String heading, String resultLabel, String reasonLabel,

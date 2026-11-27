@@ -18,7 +18,7 @@ class PrepareAssets {
     private static final String[] KINDS = {"rook", "knight", "bishop", "queen", "king", "pawn"};
 
     public static void main(String[] args) throws Exception {
-        Path atlasPath = RAW.resolve("royal-classic-sprites.png");
+        Path atlasPath = RAW.resolve("royal-arena-sprites.png");
         Path referencePath = RAW.resolve("royal-interface-2.png");
         BufferedImage atlas = read(atlasPath);
         BufferedImage reference = read(referencePath);
@@ -30,13 +30,13 @@ class PrepareAssets {
         }
 
         var manifest = new StringBuilder("""
-                # Royal Luxury assets
+                # Royal Arena and Royal Luxury assets
 
                 Target paths are relative to assets/themes/royal. Original assets are preserved locally in
                 raw-assets. The current 12 sprites come from a transparent ImageGen atlas based on
-                Chessmaster Royal Edition Interface-2.png. Each is isolated, proportionally resampled and
+                the original Royal Arena Duel design. Each is isolated, proportionally resampled and
                 bottom-centered on a transparent 512 × 512 canvas. The grid and pieces are drawn separately
-                at runtime. Classic uses the carved frame and marble from the top-down reference.
+                at runtime. Classic uses the carved frame from the original top-down reference.
 
                 | Source | Target | Source → output | Processing |
                 | --- | --- | --- | --- |
@@ -58,10 +58,7 @@ class PrepareAssets {
                 "Bezel only. Baked coordinate glyphs removed. Playing area is transparent.");
         write(Path.of("docs/design/royal-classic-reference.png"),
                 reference.getSubimage(FRAME.x, FRAME.y, FRAME.width, FRAME.height));
-        tiles(reference, true, new int[][]{{368, 333}, {546, 333}, {725, 333}, {904, 333}});
-        tiles(reference, false, new int[][]{{457, 333}, {368, 423}, {725, 423}, {992, 513}});
-        row(manifest, referencePath, "board/tile-light*.png, board/tile-dark*.png", size(reference) + " → 8 × (256 × 256)",
-                "Four unoccupied marble samples of each shade");
+        arenaTiles(manifest);
         for (String name : new String[]{"board", "board-grid"}) {
             Path source = RAW.resolve("royal_" + name.replace("board", "chessboard").replace('-', '_') + ".png");
             String target = "board/" + name + ".png";
@@ -72,7 +69,75 @@ class PrepareAssets {
 
                 The original individual sprites, marble tiles and composite sheets are still in raw-assets.
                 """);
+        arenaScene(manifest);
         Files.writeString(Path.of("docs/ASSET_MANIFEST.md"), manifest);
+    }
+
+    private static void arenaScene(StringBuilder manifest) throws Exception {
+        Path assets = OUT.getParent().getParent();
+        Path sceneryPath = RAW.resolve("royal-arena-backdrop.png");
+        var scenery = read(sceneryPath);
+        Path backdrop = assets.resolve("backgrounds/royal-arena.jpg");
+        Files.createDirectories(backdrop.getParent());
+        ImageIO.write(scenery, "JPEG", backdrop.toFile());
+
+        Path atlasPath = RAW.resolve("royal-arena-portraits.png");
+        var atlas = read(atlasPath);
+        if (atlas.getWidth() % 3 != 0 || atlas.getHeight() % 2 != 0) {
+            throw new IllegalArgumentException("Expected a 3 × 2 portrait atlas.");
+        }
+        String[] portraits = {"knight", "queen", "sage", "archer", "sovereign", "ranger"};
+        int w = atlas.getWidth() / 3, h = atlas.getHeight() / 2;
+        int extent = Math.min(w, h) - 4;
+        for (int i = 0; i < portraits.length; i++) {
+            int x = i % 3 * w + (w - extent) / 2;
+            int y = i / 3 * h + (h - extent) / 3;
+            var crop = atlas.getSubimage(x, y, extent, extent);
+            write(assets.resolve("avatars/" + portraits[i] + ".png"), scale(crop, 256, 256));
+        }
+
+        Path reference = RAW.resolve("royal-arena-duel-reference.png");
+        write(Path.of("docs/design/royal-focus-reference.png"), scale(read(reference), 1024, 576));
+        manifest.append("""
+
+                ## Arena scene and portraits
+
+                Targets in this section are relative to assets, except for the design reference.
+
+                | Source | Target | Source → output | Processing |
+                | --- | --- | --- | --- |
+                """);
+        row(manifest, sceneryPath, "backgrounds/royal-arena.jpg", size(scenery),
+                "Backdrop without board, pieces or UI, encoded as JPEG");
+        row(manifest, atlasPath, "avatars/{knight,queen,sage,archer,sovereign,ranger}.png",
+                size(atlas) + " → 6 × (256 × 256)", "Center-cropped portraits, circular masks drawn by Swing");
+        row(manifest, reference, "docs/design/royal-focus-reference.png", "1672 × 941 → 1024 × 576",
+                "Owner-provided layout reference, not a runtime image");
+    }
+
+    private static void arenaTiles(StringBuilder manifest) throws Exception {
+        Path path = RAW.resolve("royal-arena-marble.png");
+        var atlas = read(path);
+        int w = atlas.getWidth() / 4, h = atlas.getHeight() / 2;
+        int side = Math.min(w, h) - 8;
+        for (int row = 0; row < 2; row++) {
+            String shade = row == 0 ? "light" : "dark";
+            for (int col = 0; col < 4; col++) {
+                int x = col * w + (w - side) / 2, y = row * h + (h - side) / 2;
+                String target = "board/tile-" + shade + (col == 0 ? "" : "-" + col) + ".png";
+                write(OUT.resolve(target), scale(atlas.getSubimage(x, y, side, side), 256, 256));
+            }
+        }
+        row(manifest, path, "board/tile-light*.png, board/tile-dark*.png", size(atlas) + " → 8 × (256 × 256)",
+                "Four cream marble and four dark onyx samples");
+    }
+
+    private static BufferedImage scale(BufferedImage source, int width, int height) {
+        var result = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = graphics(result);
+        g.drawImage(source, 0, 0, width, height, null);
+        g.dispose();
+        return result;
     }
 
     private static BufferedImage cleanSprite(BufferedImage cell) {
@@ -190,18 +255,6 @@ class PrepareAssets {
                 }
                 frame.setRGB(x - FRAME.x, y - FRAME.y, result);
             }
-        }
-    }
-
-    private static void tiles(BufferedImage reference, boolean light, int[][] corners) throws Exception {
-        String shade = light ? "light" : "dark";
-        for (int i = 0; i < corners.length; i++) {
-            var tile = new BufferedImage(256, 256, BufferedImage.TYPE_INT_RGB);
-            Graphics2D g = graphics(tile);
-            int x = corners[i][0], y = corners[i][1];
-            g.drawImage(reference, 0, 0, 256, 256, x, y, x + 84, y + 84, null);
-            g.dispose();
-            write(OUT.resolve("board/tile-" + shade + (i == 0 ? "" : "-" + i) + ".png"), tile);
         }
     }
 

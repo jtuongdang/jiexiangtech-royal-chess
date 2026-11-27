@@ -36,6 +36,8 @@ public interface ChessStore {
     List<Profile> leaderboard();
     Preferences settings(long owner, String defaultLanguage);
     void settings(long owner, Preferences settings);
+    String avatar(long owner);
+    void avatar(long owner, String avatarId);
     String rememberedUsername();
     void rememberUsername(String username);
     int recordPuzzle(long owner, String puzzleId, boolean solved, boolean hinted);

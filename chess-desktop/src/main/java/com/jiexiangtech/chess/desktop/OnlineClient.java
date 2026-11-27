@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jiexiangtech.chess.online.OnlineProtocol;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import com.jiexiangtech.chess.online.OnlineProtocol.*;
 
 final class OnlineClient {
@@ -54,12 +55,12 @@ final class OnlineClient {
         return scheme.toLowerCase(Locale.ROOT) + "://" + uri.getRawAuthority();
     }
 
-    CompletableFuture<Snapshot> create(Seat seat, String name, Control control, String organizerKey) {
-        return send(seat, "/rooms", new Create(seat.room(), name, control), organizerKey);
+    CompletableFuture<Snapshot> create(Seat seat, String name, Control control, String organizerKey, RoyalAvatar avatar) {
+        return send(seat, "/rooms", new Create(seat.room(), name, control, avatar.id()), organizerKey);
     }
 
-    CompletableFuture<Snapshot> join(Seat seat, String name) {
-        return send(seat, endpoint(seat) + "/join", new Join(name), null);
+    CompletableFuture<Snapshot> join(Seat seat, String name, RoyalAvatar avatar) {
+        return send(seat, endpoint(seat) + "/join", new Join(name, avatar.id()), null);
     }
 
     CompletableFuture<Snapshot> sync(Seat seat) { return send(seat, endpoint(seat), null, null); }
@@ -97,6 +98,7 @@ final class OnlineClient {
         try {
             var request = HttpRequest.newBuilder(URI.create(seat.server() + OnlineProtocol.API + path))
                     .header("Accept", "application/json")
+                    .header(OnlineProtocol.AVATAR_HEADER, "1")
                     .header("Authorization", "Bearer " + seat.token())
                     .timeout(Duration.ofSeconds(95));
             if (body == null) request.GET();

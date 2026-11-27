@@ -51,6 +51,19 @@ class StoreTest {
         assertEquals(List.of(player), store.leaderboard().stream().map(ChessStore.Profile::user).toList());
     }
 
+    @Test void avatarIsPerProfileAndSurvivesReopeningAnExistingDatabase() {
+        var store = new SqliteChessStore(file());
+        var player = store.register("knight", "Royal Knight", new Pbkdf2Passwords().hash("testpass".toCharArray()));
+        assertNull(store.avatar(player.id()));
+        store.avatar(player.id(), "knight");
+        store.avatar(ChessStore.GUEST_ID, "sage");
+        store.settings(player.id(), Preferences.defaults("vi"));
+
+        var reopened = new SqliteChessStore(file());
+        assertEquals("knight", reopened.avatar(player.id()));
+        assertEquals("sage", reopened.avatar(ChessStore.GUEST_ID));
+    }
+
     @Test void moveAndHeaderRollbackTogetherThenRestoreAfterRetry() throws Exception {
         var store = new SqliteChessStore(file());
         long owner = ChessStore.GUEST_ID;

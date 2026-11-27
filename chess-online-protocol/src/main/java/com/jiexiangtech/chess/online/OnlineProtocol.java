@@ -8,6 +8,7 @@ import com.jiexiangtech.chess.domain.Side;
 
 public final class OnlineProtocol {
     public static final String API = "/api/v1";
+    public static final String AVATAR_HEADER = "X-Royal-Avatars";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private OnlineProtocol() {}
@@ -34,14 +35,19 @@ public final class OnlineProtocol {
 
     public enum Action { MOVE, RESIGN, OFFER_DRAW, ACCEPT_DRAW, CLAIM_DRAW }
 
-    public record Create(String roomId, String name, Control control) {}
-    public record Join(String name) {}
+    public record Create(String roomId, String name, Control control, String avatar) {
+        public Create(String roomId, String name, Control control) { this(roomId, name, control, null); }
+    }
+    public record Join(String name, String avatar) {
+        public Join(String name) { this(name, null); }
+    }
     public record Command(String id, long version, Action action, String uci) {}
     public record Ply(String uci, String san) {}
     public record Problem(String code) {}
     public record Snapshot(String roomId, long version, Side seat, Control control, String white, String black,
                            String fen, Side turn, long whiteMillis, long blackMillis, long deadline,
-                           Side drawOfferedBy, Outcome outcome, List<Ply> moves, long serverTime) {
+                           Side drawOfferedBy, Outcome outcome, List<Ply> moves, long serverTime,
+                           String whiteAvatar, String blackAvatar) {
         public Snapshot { moves = List.copyOf(moves); }
         public boolean playing() { return black != null && outcome == null; }
     }

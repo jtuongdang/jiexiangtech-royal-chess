@@ -1,6 +1,6 @@
 # Implementation status
 
-November 26, 2026 · ChessMaster – Royal Edition · JIEXIANGTECH (杰祥科技)
+November 27, 2026 · ChessMaster – Royal Edition · JIEXIANGTECH (杰祥科技)
 
 The existing desktop architecture (`com.jiexiangtech:royal-chess`) and working domain,
 SQLite persistence, authentication, and AI engine layers were preserved in place. The desktop
@@ -20,12 +20,15 @@ approved Splash/Login baseline and both official visual references.
 | Persistence | SQLite migration, PBKDF2, per-profile data, atomic snapshots, safe rollback and replay-based restore |
 | AI | Four levels, time limits, cancellation, analysis and optional external Stockfish validated with Stockfish 19 |
 | Piece motion | Classic and Focus share time-based easing, drag settling and capture/castling/promotion transitions. The Ultra setting requests an 8 ms repaint interval during moves |
-| Desktop verification | Maven passed all 37 tests. Live macOS Swing captures verify the current Classic and Focus visuals, including Classic at minimum window size |
+| Royal Arena | Castle backdrop, player portraits and clocks around a VS header, revised perspective, 12 ivory and onyx sprites, and eight marble variants for Classic and Focus. Both modes still use the live match position |
+| Avatars | Settings provides six portraits and the Royal emblem. SQLite stores the selection per profile. The updated online server stores the portrait preset ID on each seat and returns it to clients that support portraits |
+| Desktop verification | Maven passed all 39 tests, including the MongoDB integration suite. Live macOS Swing captures cover Classic, Royal Arena and the avatar picker |
 | Online beta | Live on Render Free in Singapore with MongoDB Atlas Free. Two live matches verified over HTTPS/WebSocket. Desktop v1.2.0 upgrades the Online UX with tabbed Create/Join lobby, collapsible server settings, cold-start feedback, prominent waiting invite banner, visible player names & low-time clock warning, move/result audio cues, and a match-outcome dialog with Back-to-Lobby |
 | GitHub | Public repository at `jtuongdang/jiexiangtech-royal-chess` |
 
 ## Remaining scope
 
+- Battle Map campaign progression, unlocks and rewards are a separate feature phase.
 - The live beta uses a private Docker Hub image. Its Render pull credential expires on February 24, 2027. Automated GitHub Actions publishing still requires a separate write credential. Cloud accounts and rated matchmaking are later phases.
 - Atlas project cleanup remains. The earlier unused `chessmaster_render` database user and the IP entry created by Atlas Auto Setup remain in the project. The service uses `royal_beta_render` and the Render Singapore outbound range.
 - General dead-position and flag-fall adjudication still lack a complete reachability solver for unusual positions.

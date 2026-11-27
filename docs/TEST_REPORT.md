@@ -1,5 +1,27 @@
 # Test report
 
+## Royal Arena · November 27, 2026
+
+Apple Silicon macOS, OpenJDK 17 and local MongoDB 8.2.0. The seven-module Maven reactor
+passed `mvn -o -B -ntp clean verify` with `ROYAL_TEST_MONGO_URI` set to an isolated test database.
+
+| Module | Passed | Arena coverage |
+| --- | ---: | --- |
+| Domain | 14 | Chess rules and perft |
+| Application | 3 | Restore, authentication and puzzles |
+| Infrastructure | 7 | Per-profile portrait selection survives closing and reopening SQLite |
+| Desktop | 9 | Packaged Arena scene and portraits, sprite alpha, geometry, hit testing and animation |
+| Server | 6 | Both avatar IDs survive join, moves, reconnect and MongoDB-backed server restart. Legacy snapshots retain their original fields |
+| **Total** | **39** | **0 failures, 0 errors, 0 skipped** |
+
+The desktop Swing visual smoke captured [Royal Arena](screenshots/royal-focus-actual.png),
+[Classic](screenshots/gameplay.png), [the minimum window](screenshots/gameplay-minimum.png),
+and [the avatar picker](screenshots/royal-arena-avatars.png). The [live comparison](screenshots/royal-focus-comparison.png)
+pairs the actual Focus capture with the supplied design.
+The built desktop JAR passed its launcher smoke check, including `perft(3)=8902`.
+
+## Earlier releases · November 26, 2026
+
 Verification on November 26, 2026 used Apple Silicon macOS 15.6, OpenJDK 17, and Maven.
 
 ## Maven verification (`mvn -o -B -ntp clean verify`)

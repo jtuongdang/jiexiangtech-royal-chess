@@ -11,7 +11,7 @@ import com.jiexiangtech.chess.online.OnlineProtocol.*;
 @Document("online_games")
 record RoomDocument(@Id String roomId, long version, Control control, Seat white, Seat black,
                     BoardState board, List<Applied> commands, Date expiresAt) {
-    record Seat(String name, String tokenHash) {}
+    record Seat(String name, String tokenHash, String avatar) {}
     record BoardState(String fen, Side turn, long whiteMillis, long blackMillis, long deadline,
                       Side drawOfferedBy, Outcome outcome) {
         long remaining(Side side) { return side == Side.WHITE ? whiteMillis : blackMillis; }

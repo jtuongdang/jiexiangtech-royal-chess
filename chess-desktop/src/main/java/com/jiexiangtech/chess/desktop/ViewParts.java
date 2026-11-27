@@ -60,6 +60,13 @@ final class ViewParts {
         return RoyalDialog.promote(parent, assets, i18n, side);
     }
 
+    static JLabel arenaVersus(I18n text) {
+        JLabel versus = title(text.get("arenaVersus"), 28);
+        versus.setForeground(PALE);
+        versus.setHorizontalAlignment(SwingConstants.CENTER);
+        return versus;
+    }
+
     static boolean flip(Preferences prefs, Side side) {
         return switch (prefs.orientation()) {
             case BLACK -> true;

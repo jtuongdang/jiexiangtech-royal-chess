@@ -1,5 +1,7 @@
 package com.jiexiangtech.chess.server;
 
+import com.jiexiangtech.chess.online.RoyalAvatar;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -50,7 +52,8 @@ final class RoomService {
         String hash = tokenHash(authorization);
         long now = clock.millis();
         long base = request.control().baseMillis;
-        var room = new RoomDocument(request.roomId(), 0, request.control(), new Seat(name(request.name()), hash), null,
+        var room = new RoomDocument(request.roomId(), 0, request.control(),
+                new Seat(name(request.name()), hash, RoyalAvatar.byId(request.avatar()).id()), null,
                 new BoardState(Position.INITIAL_FEN, Side.WHITE, base, base, 0, null, null),
                 java.util.List.of(), new Date(now + WAIT_MS));
         if (!store.insert(room)) {
@@ -62,7 +65,7 @@ final class RoomService {
 
     Snapshot join(String id, Join request, String authorization) {
         if (request == null) throw bad();
-        Seat seat = new Seat(name(request.name()), tokenHash(authorization));
+        Seat seat = new Seat(name(request.name()), tokenHash(authorization), RoyalAvatar.byId(request.avatar()).id());
         RoomDocument current = find(id);
         Side existing = seatFor(current, seat.tokenHash());
         if (existing != null) return snapshot(current, existing, clock.millis());
@@ -204,7 +207,8 @@ final class RoomService {
         return new Snapshot(room.roomId(), room.version(), side, room.control(), room.white().name(),
                 room.black() == null ? null : room.black().name(), state.fen(), state.turn(),
                 remaining(state, Side.WHITE, now), remaining(state, Side.BLACK, now), state.deadline(),
-                state.drawOfferedBy(), state.outcome(), moves, now);
+                state.drawOfferedBy(), state.outcome(), moves, now, RoyalAvatar.byId(room.white().avatar()).id(),
+                room.black() == null ? null : RoyalAvatar.byId(room.black().avatar()).id());
     }
 
     private static long remaining(BoardState state, Side side, long now) {

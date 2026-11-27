@@ -11,6 +11,10 @@ chess domain for legality, mate, timeouts and draws. Client-side settings and of
 use SQLite. Cloud accounts, rated matchmaking, online game-history search and hosted analysis
 remain future work.
 
+Choose a portrait in **Settings → Choose Avatar** before creating or joining a room. With
+an avatar-capable desktop and server, both seats see the portraits saved at join time.
+The service stores the preset identifiers and the desktop renders the bundled artwork.
+
 ## Connect to the hosted beta
 
 Enter `https://jiexiangtech-royal-chess.onrender.com` in **Play online**. The organizer

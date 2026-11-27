@@ -75,6 +75,16 @@ class AssetsTest {
         }
     }
 
+    @Test void arenaBackdropAndAllBundledPortraitsArePackaged() {
+        var assets = new AssetManager();
+        assertNotNull(assets.brand(BrandingManager.ARENA_BG));
+        for (var avatar : com.jiexiangtech.chess.online.RoyalAvatar.values()) {
+            if (avatar == com.jiexiangtech.chess.online.RoyalAvatar.EMBLEM) continue;
+            assertEquals(256, assets.avatar(avatar).getWidth());
+            assertEquals(256, assets.avatar(avatar).getHeight());
+        }
+    }
+
     @Test void coordinatesRoundTripAndPaintAnEightByEightBoardAtTwoSizes() throws Exception {
         var assets = new AssetManager();
         SwingUtilities.invokeAndWait(() -> {

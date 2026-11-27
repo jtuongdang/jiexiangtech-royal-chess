@@ -32,13 +32,19 @@ class OnlineHttpTest {
         long version;
         try (var running = start()) {
             assertEquals(200, exchange("GET", "/health", null, null, null).statusCode());
-            var initial = snapshot("POST", rooms, new Create(room, "White", Control.RAPID_10_5), host, KEY);
+            var initial = snapshot("POST", rooms, new Create(room, "White", Control.RAPID_10_5, "knight"), host, KEY);
             assertFalse(initial.playing());
+            assertEquals("knight", initial.whiteAvatar());
             var whiteInbox = new LinkedBlockingQueue<String>();
             var whiteSocket = events(host, whiteInbox);
             assertEquals("sync", whiteInbox.poll(4, TimeUnit.SECONDS));
-            var joined = snapshot("POST", rooms + "/" + room + "/join", new Join("Black"), guest, null);
+            var joined = snapshot("POST", rooms + "/" + room + "/join", new Join("Black", "queen"), guest, null);
             assertEquals(Side.BLACK, joined.seat());
+            assertEquals("queen", joined.blackAvatar());
+            var legacy = exchange("GET", rooms + "/" + room, null, host, null);
+            assertEquals(200, legacy.statusCode());
+            assertFalse(json.readTree(legacy.body()).has("whiteAvatar"));
+            assertFalse(json.readTree(legacy.body()).has("blackAvatar"));
             assertEquals(Long.toString(joined.version()), whiteInbox.poll(4, TimeUnit.SECONDS));
 
             var blackInbox = new LinkedBlockingQueue<String>();
@@ -69,6 +75,8 @@ class OnlineHttpTest {
             assertEquals(fen, view.fen());
             assertEquals(version, view.version());
             assertEquals(2, view.moves().size());
+            assertEquals("knight", view.whiteAvatar());
+            assertEquals("queen", view.blackAvatar());
             var retry = snapshot("POST", rooms + "/" + room + "/commands", opening, host, null);
             assertEquals(version, retry.version());
             assertEquals(2, retry.moves().size());
@@ -96,15 +104,21 @@ class OnlineHttpTest {
     }
 
     private Snapshot snapshot(String method, String path, Object body, String token, String key) throws Exception {
-        var response = exchange(method, path, body, token, key);
+        var response = exchange(method, path, body, token, key, true);
         assertEquals(200, response.statusCode(), response.body());
         return json.readValue(response.body(), Snapshot.class);
     }
 
     private HttpResponse<String> exchange(String method, String path, Object body, String token, String key) throws Exception {
+        return exchange(method, path, body, token, key, false);
+    }
+
+    private HttpResponse<String> exchange(String method, String path, Object body, String token, String key,
+                                          boolean avatars) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(5));
         if (token != null) request.header("Authorization", "Bearer " + token);
+        if (avatars) request.header(OnlineProtocol.AVATAR_HEADER, "1");
         if (key != null) request.header("X-Royal-Beta-Key", key);
         if (body != null) request.header("Content-Type", "application/json");
         request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()

@@ -15,8 +15,8 @@ approximately 89.1 × 91.3 px per cell, so the live grid regularizes this small 
 The Classic renderer fits those ratios to the available window space, rounding to the nearest
 screen pixel. Each piece uses a rectangle measured by side and kind in the reference.
 File and rank labels are painted dynamically and follow the current orientation. The frame is
-an eight-slice bezel with a transparent center, and the eight marble samples come from empty
-reference squares. Positions, move highlights and animations are rendered independently.
+an eight-slice bezel with a transparent center. The eight marble samples and the 12 piece
+sprites use the Royal Arena artwork. Positions, move highlights and animations are rendered independently.
 
 The comparison uses a live six-ply position with a selected knight on e4. The position
 and sidebar content can differ from the supplied mockup. Geometry matches the measured
@@ -24,11 +24,12 @@ ratios, while the 12 redrawn pieces retain small differences in reflections and 
 
 [Original board crop](royal-classic-reference.png) · [Reference and live board](../screenshots/royal-classic-comparison.png)
 
-## Sprite generation
+## Original Interface-2 sprite generation
 
 The built-in ImageGen tool produced one 2172 × 724 RGBA atlas. The unmodified local atlas
-is stored at `raw-assets/royal-classic-sprites.png`. Run `scripts/PrepareAssets.java` and
-then `scripts/PrepareBranding.java` with Java 17 for the runtime derivatives and manifest.
+is stored at `raw-assets/royal-classic-sprites.png`. The current source sheets are documented
+in the [asset manifest](../ASSET_MANIFEST.md). Run `java scripts/PrepareAssets.java` and
+then `java scripts/PrepareBranding.java` with Java 17 to rebuild the derivatives and manifest.
 
 <details>
 <summary>ImageGen prompt</summary>

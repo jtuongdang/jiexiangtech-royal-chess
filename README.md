@@ -18,6 +18,7 @@ and keep games, preferences and puzzle progress in a local SQLite database.
 
 - Play with two people on one computer or face four AI levels. Choose sides, a time control and increment.
 - Move by clicking or dragging. The board shows legal destinations, the last move and check. Choose a piece when promoting.
+- Switch between Classic 2D and the Royal Arena perspective during a match. Choose one of six portraits or the Royal emblem in Settings.
 - Sign in to a local profile or play as a guest. Live games can save after each move and resume with the clocks paused while the app is closed.
 - Search and replay game history, analyze a position, and import or export a single PGN game.
 - Solve four verified mate-in-one puzzles. Earn points on the first unassisted solve of each puzzle and unlock Royal Slate after three.
@@ -35,6 +36,8 @@ These captures come from the macOS Swing application in both **Classic 2D** and 
 | --- | --- |
 | ![Live match on the Classic 2D Royal Luxury board](docs/screenshots/gameplay.png) | ![Live match on the Royal Focus 2.5D board](docs/screenshots/royal-focus-actual.png) |
 
+[Avatar picker](docs/screenshots/royal-arena-avatars.png) · [Arena design and live comparison](docs/screenshots/royal-focus-comparison.png)
+
 ## Download & install
 
 The [latest GitHub release](https://github.com/jtuongdang/jiexiangtech-royal-chess/releases/latest) contains native applications with a bundled Java runtime and a portable JAR for Java 17+.
@@ -47,7 +50,7 @@ From a checkout at the repository root:
 
 ```sh
 mvn clean verify
-java -jar chess-desktop/target/royal-chess-1.1.0-all.jar
+scripts/run.sh
 ```
 
 On macOS, [build.sh](scripts/build.sh) and [run.sh](scripts/run.sh) select the installed Java 17 JDK when `JAVA_HOME` is unset. On Windows, run `scripts\run.bat` after Maven succeeds. Build native images with the bundled runtime on the host operating system:

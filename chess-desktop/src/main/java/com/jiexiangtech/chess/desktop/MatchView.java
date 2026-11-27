@@ -10,6 +10,7 @@ import javax.swing.border.EmptyBorder;
 import com.jiexiangtech.chess.application.*;
 import com.jiexiangtech.chess.domain.*;
 import com.jiexiangtech.chess.infrastructure.AlphaBetaChessEngine;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 import static com.jiexiangtech.chess.desktop.ViewParts.*;
 
@@ -104,12 +105,10 @@ final class MatchView extends JPanel {
         setLayout(new BorderLayout(0, 0));
         setBorder(new EmptyBorder(6, 14, 6, 14));
 
-        // TOP AREA: JIEXIANGTECH horizontal logo + [Black Card | ChessMaster Royal Emblem | White Card]
         JPanel topBlock = transparent(new BorderLayout(0, 4));
 
         JPanel corpRow = transparent(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        corpRow.add(frame.branding().logo(BrandingManager.COMPANY_HORIZONTAL, 198, 38,
-                BrandConstants.COMPANY + " " + BrandConstants.COMPANY_CHINESE));
+        corpRow.add(eyebrow(text.get("arenaTitle")));
         topBlock.add(corpRow, BorderLayout.NORTH);
 
         JPanel playerBar = transparent(new GridBagLayout());
@@ -124,7 +123,7 @@ final class MatchView extends JPanel {
         playerBar.add(leftCard, pc);
 
         pc.gridx = 1; pc.weightx = 0.24; pc.anchor = GridBagConstraints.CENTER; pc.insets = new Insets(0, 4, 0, 4);
-        playerBar.add(buildCenterWordmark(), pc);
+        playerBar.add(arenaVersus(text), pc);
 
         pc.gridx = 2; pc.weightx = 0.38; pc.anchor = GridBagConstraints.EAST; pc.insets = new Insets(0, 4, 0, 4);
         playerBar.add(rightCard, pc);
@@ -184,26 +183,6 @@ final class MatchView extends JPanel {
                 drawerToggleBtn, modeSwitchBtn, pauseIconBtn);
         toolbar.setFocusDimmed(true);
         add(toolbar, BorderLayout.SOUTH);
-    }
-
-    private static JPanel buildCenterWordmark() {
-        JPanel p = transparent(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 0; c.gridy = 0; c.insets = new Insets(0, 0, 2, 0);
-        p.add(new JLabel(RoyalIcons.icon(RoyalIcons.Glyph.CROWN, 24, PALE)), c);
-
-        JLabel main = new JLabel("CHESSMASTER");
-        main.setForeground(new Color(0xF3D47E));
-        main.setFont(serif(Font.BOLD, 21));
-        c.gridy = 1; c.insets = new Insets(0, 0, 1, 0);
-        p.add(main, c);
-
-        JLabel sub = new JLabel("R O Y A L   E D I T I O N");
-        sub.setForeground(new Color(0xC9A750));
-        sub.setFont(sans(Font.BOLD, 9.5f));
-        c.gridy = 2; c.insets = new Insets(0, 0, 0, 0);
-        p.add(sub, c);
-        return p;
     }
 
     // =========================================================================
@@ -316,7 +295,10 @@ final class MatchView extends JPanel {
             badge = text.get("badgeLocal");
             elo = frame.currentRating();
         }
-        return new RoyalPlayerCard(frame.assets(), side, name, badge, isComputer, text.get("elo", String.valueOf(elo)));
+        RoyalAvatar portrait = isComputer ? RoyalAvatar.SOVEREIGN
+                : side == opts.human() ? frame.avatar() : RoyalAvatar.EMBLEM;
+        return new RoyalPlayerCard(frame.assets(), side, name, badge, isComputer,
+                text.get("elo", String.valueOf(elo)), portrait);
     }
 
     private static RoyalButton gameControl(String label, RoyalButton.Variant variant, RoyalIcons.Glyph glyph, Runnable action) {

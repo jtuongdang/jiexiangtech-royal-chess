@@ -3,9 +3,8 @@ package com.jiexiangtech.chess.desktop;
 import java.awt.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import com.jiexiangtech.chess.domain.Kind;
-import com.jiexiangtech.chess.domain.Piece;
 import com.jiexiangtech.chess.domain.Side;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 
 final class RoyalPlayerCard extends JPanel {
@@ -19,9 +18,13 @@ final class RoyalPlayerCard extends JPanel {
     private String lastClockText;
     private String lastRatingOverride;
 
-    RoyalPlayerCard(AssetManager assets, Side side, String playerName, String badgeText, boolean isAi, String ratingText) {
+    private RoyalAvatar portrait;
+
+    RoyalPlayerCard(AssetManager assets, Side side, String playerName, String badgeText, boolean isAi,
+                    String ratingText, RoyalAvatar portrait) {
         super(new BorderLayout(11, 0));
         this.side = side;
+        this.portrait = portrait;
         setOpaque(false);
         setBorder(new EmptyBorder(10, 16, 10, 12));
         setPreferredSize(new Dimension(340, 72));
@@ -38,15 +41,7 @@ final class RoyalPlayerCard extends JPanel {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
                 int w = getWidth(), h = getHeight();
-                Color top = side == Side.WHITE ? new Color(0x46371F) : new Color(0x272226);
-                Color bot = side == Side.WHITE ? new Color(0x1E180F) : new Color(0x121115);
-                g.setPaint(new GradientPaint(0, 0, top, 0, h, bot));
-                g.fillOval(2, 2, w - 4, h - 4);
-
-                // Radiant warm portrait backdrop inside circle so both black & white emblems pop cleanly
-                RoyalGlowEffect.paintAmbientSpotlight(g, w / 2f, h * 0.48f, w * 0.46f,
-                        side == Side.WHITE ? new Color(248, 220, 134, 92) : new Color(224, 186, 94, 98));
-                assets.drawPieceFitted(g, Piece.of(side, Kind.KING), 8, 5, w - 16, h - 10);
+                AvatarIcon.paintPortrait(g, assets, RoyalPlayerCard.this.portrait, side, w, h);
 
                 // Ornate metallic gold avatar ring
                 g.setPaint(new LinearGradientPaint(0, 0, w, h,
@@ -114,6 +109,17 @@ final class RoyalPlayerCard extends JPanel {
         add(avatar, BorderLayout.WEST);
         add(center, BorderLayout.CENTER);
         add(clockWrap, BorderLayout.EAST);
+    }
+
+    void identity(String name, RoyalAvatar avatar) {
+        if (!name.equals(nameLabel.getText())) {
+            nameLabel.setText(name);
+            nameLabel.setToolTipText(name);
+        }
+        if (portrait != avatar) {
+            portrait = avatar;
+            repaint();
+        }
     }
 
     void update(String clockText, boolean timed, boolean active, boolean lowTime, boolean check, String ratingOverride) {

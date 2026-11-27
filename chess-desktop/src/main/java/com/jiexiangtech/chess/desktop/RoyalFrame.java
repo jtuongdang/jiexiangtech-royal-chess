@@ -23,13 +23,14 @@ import org.slf4j.LoggerFactory;
 import com.jiexiangtech.chess.application.*;
 import com.jiexiangtech.chess.domain.*;
 import com.jiexiangtech.chess.infrastructure.ChessEngines;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
 import static com.jiexiangtech.chess.desktop.ViewParts.*;
 
 final class RoyalFrame extends JFrame {
     record Receipt(int before, int after) {}
     private record HomeData(ChessStore.Profile profile, List<ChessStore.Summary> history) {}
-    private record LoginData(ChessStore.User user, Preferences preferences) {}
+    private record LoginData(ChessStore.User user, Preferences preferences, RoyalAvatar avatar) {}
     private record ImportedFile(String raw, Pgn.Imported pgn) {}
     private record LoadedGame(MatchSnapshot snapshot, GameSession session) {}
     private enum Page { HOME, NEW, ONLINE, PUZZLES, HISTORY, LEADERBOARD, STATISTICS, ACHIEVEMENTS, SETTINGS }
@@ -47,6 +48,7 @@ final class RoyalFrame extends JFrame {
     private final UiJobs jobs = new UiJobs();
     private I18n text;
     private Preferences prefs;
+    private RoyalAvatar avatar = RoyalAvatar.EMBLEM;
     private ChessStore.User user;
     private ChessStore.Profile profile;
     private MatchView match;
@@ -100,6 +102,7 @@ final class RoyalFrame extends JFrame {
 
     I18n text() { return text; }
     Preferences prefs() { return prefs; }
+    RoyalAvatar avatar() { return avatar; }
     AssetManager assets() { return assets; }
     SoundManager sounds() { return sounds; }
     ChessEngines engines() { return engines; }
@@ -179,7 +182,7 @@ final class RoyalFrame extends JFrame {
             jobs.submit(() -> {
                 var authenticated = registering ? accounts.register(name, shown, secret, repeated)
                         : accounts.signIn(name, secret, keep).orElse(null);
-                return authenticated == null ? null : new LoginData(authenticated, store.settings(authenticated.id(), language));
+                return authenticated == null ? null : loadProfile(authenticated, language);
             }, data -> {
                 if (token != generation) return;
                 submit.setEnabled(true);
@@ -201,8 +204,7 @@ final class RoyalFrame extends JFrame {
         JButton switchMode = button(t(registering ? "login" : "register"), false, () -> auth(!registering));
         JButton guest = button(t("guest"), false, () -> {
             String language = authLanguage;
-            jobs.submit(() -> new LoginData(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"),
-                        store.settings(ChessStore.GUEST_ID, language)),
+            jobs.submit(() -> loadProfile(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"), language),
                     data -> { if (token == generation) enter(data); },
                     failure -> { if (token == generation) error("storeError", failure); });
         });
@@ -225,9 +227,14 @@ final class RoyalFrame extends JFrame {
         auth(registering);
     }
 
+    private LoginData loadProfile(ChessStore.User player, String language) {
+        return new LoginData(player, store.settings(player.id(), language), RoyalAvatar.byId(store.avatar(player.id())));
+    }
+
     private void enter(LoginData data) {
         user = data.user();
         prefs = data.preferences();
+        avatar = data.avatar();
         text = new I18n(prefs.language());
         dashboard();
     }
@@ -262,10 +269,11 @@ final class RoyalFrame extends JFrame {
     }
 
     private void mountShell() {
-        boolean focusActive = currentContent instanceof MatchView mv && mv.isFocusMode();
+        boolean focusActive = (currentContent instanceof MatchView mv && mv.isFocusMode())
+                || (currentContent instanceof OnlineView ov && ov.isFocusMatch());
         boolean cinematicBackdrop = currentContent instanceof MatchView || currentContent instanceof PuzzleView || currentContent instanceof ReplayView
                 || currentContent instanceof OnlineView;
-        String bgPath = focusActive ? BrandingManager.FOCUS_BG : cinematicBackdrop ? BrandingManager.GAMEPLAY_BG : null;
+        String bgPath = focusActive ? BrandingManager.ARENA_BG : cinematicBackdrop ? BrandingManager.GAMEPLAY_BG : null;
         JPanel root = new RoyalBackgroundPanel(new BorderLayout(),
                 bgPath == null ? null : assets.brand(bgPath), 0, false);
         RoyalNavigationPanel nav = navigationPanel(currentPage, sidebarCompact);
@@ -1428,6 +1436,10 @@ final class RoyalFrame extends JFrame {
         scalePillWrap.add(scaleReadout);
         scaleBox.add(scalePillWrap, BorderLayout.EAST);
         visualGrid.add(labeledControl(t("scale"), scaleBox));
+        RoyalButton avatarButton = button(t("avatarChoose"), RoyalButton.Variant.SECONDARY, null,
+                () -> RoyalDialog.avatarPicker(this, avatar, this::saveAvatar).setVisible(true));
+        avatarButton.setIcon(new AvatarIcon(assets, avatar, Side.WHITE, 42));
+        visualGrid.add(labeledControl(t("avatarProfile"), avatarButton));
         appearance.add(visualGrid, BorderLayout.CENTER);
         JPanel qualityRow = transparent(new FlowLayout(FlowLayout.LEFT, 0, 4));
         qualityRow.add(quality);
@@ -1476,6 +1488,18 @@ final class RoyalFrame extends JFrame {
             text = new I18n(saved.language());
             settingsForm();
             setStatus(t("preferencesSaved"));
+        }, failure -> { if (generation == token) error("storeError", failure); });
+    }
+
+    private void saveAvatar(RoyalAvatar selected) {
+        long token = generation, owner = user.id();
+        jobs.submit(() -> { store.avatar(owner, selected.id()); return selected; }, saved -> {
+            if (user == null || user.id() != owner) return;
+            avatar = saved;
+            if (generation == token) {
+                settingsForm();
+                setStatus(t("avatarSaved"));
+            }
         }, failure -> { if (generation == token) error("storeError", failure); });
     }
 
@@ -1547,7 +1571,9 @@ final class RoyalFrame extends JFrame {
     // VISUAL QA / SMOKE HOOKS (DRIVES THE REAL UI SCREENS)
     // =========================================================================
 
-    void visualGuest() { enter(new LoginData(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"), prefs)); }
+    void visualGuest() {
+        enter(new LoginData(new ChessStore.User(ChessStore.GUEST_ID, "@guest", "Guest"), prefs, RoyalAvatar.KNIGHT));
+    }
 
     void visualMatch() {
         var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,
@@ -1583,6 +1609,7 @@ final class RoyalFrame extends JFrame {
     void visualStatistics() { statistics(); }
     void visualAchievements() { achievements(); }
     void visualSettings() { settings(); }
+    JDialog visualAvatarPicker() { return RoyalDialog.avatarPicker(this, avatar, ignored -> {}); }
 
     void visualResult() {
         var game = GameSession.start(user.id(), new MatchOptions(MatchOptions.Mode.COMPUTER, Side.WHITE,

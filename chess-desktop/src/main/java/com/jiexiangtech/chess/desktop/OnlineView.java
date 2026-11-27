@@ -11,6 +11,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import com.jiexiangtech.chess.domain.*;
 import com.jiexiangtech.chess.online.OnlineProtocol;
+import com.jiexiangtech.chess.online.RoyalAvatar;
 import com.jiexiangtech.chess.online.OnlineProtocol.*;
 import com.jiexiangtech.chess.online.OnlineProtocol.Action;
 import static com.jiexiangtech.chess.desktop.RoyalStyle.*;
@@ -29,10 +30,9 @@ final class OnlineView extends JPanel {
     private final Timer coldStartTimer;
     private final JLabel notice = label(" ", MUTED);
     private final JLabel gameStatus = label(" ", PALE);
-    private final JLabel whitePlayer = label(" ", MUTED);
-    private final JLabel blackPlayer = label(" ", MUTED);
-    private final JLabel whiteClock = title("—", 24);
-    private final JLabel blackClock = title("—", 24);
+    private RoyalPlayerCard whiteCard, blackCard;
+    private RoyalCapturedTray captures;
+    private boolean check;
     private OnlineClient.Seat seat;
     private OnlineClient.Seat lastSeat;
     private OnlineClient.Seat attempt;
@@ -76,6 +76,8 @@ final class OnlineView extends JPanel {
         if (socket != null) socket.abort();
     }
 
+    boolean isFocusMatch() { return snapshot != null && focus.isFocusMode(); }
+
     private void returnToLobby() {
         timer.stop();
         coldStartTimer.stop();
@@ -95,6 +97,7 @@ final class OnlineView extends JPanel {
         waitingBanner = null;
         backToLobby = null;
         lobby();
+        frame.refreshShellAtmosphere();
     }
 
     private void updateResumeButtons() {
@@ -151,7 +154,7 @@ final class OnlineView extends JPanel {
                 char[] input = key.getPassword();
                 String organizerKey = new String(input);
                 java.util.Arrays.fill(input, '\0');
-                open(next, client.create(next, createName.getText(), (Control) control.getSelectedItem(), organizerKey),
+                open(next, client.create(next, createName.getText(), (Control) control.getSelectedItem(), organizerKey, frame.avatar()),
                         () -> key.setText(""));
             } catch (IllegalArgumentException invalid) { showNotice("onlineInvalidServer", ERROR_TEXT); }
         });
@@ -178,7 +181,7 @@ final class OnlineView extends JPanel {
                         ? attempt : new OnlineClient.Seat(address, room, OnlineProtocol.seatToken());
                 attempt = next;
                 creatingAttempt = false;
-                open(next, client.join(next, joinName.getText()), null);
+                open(next, client.join(next, joinName.getText(), frame.avatar()), null);
             } catch (IllegalArgumentException invalid) { showNotice("onlineInvalidServer", ERROR_TEXT); }
         });
         resumeJoin = button(text.get("resume"), false, () -> {
@@ -281,14 +284,30 @@ final class OnlineView extends JPanel {
 
         JPanel mast = transparent(new BorderLayout(10, 0));
         var copy = button(text.get("onlineCopy"), false, this::copyInviteCode);
-        mast.add(heading(text.get("online"), row(label(seat.room(), PALE), copy)), BorderLayout.CENTER);
+        mast.add(heading(text.get("arenaTitle"), row(label(seat.room(), PALE), copy)), BorderLayout.NORTH);
+        whiteCard = playerCard(Side.WHITE, value);
+        blackCard = playerCard(Side.BLACK, value);
+        boolean flipped = flip(frame.prefs(), value.seat());
+        JPanel playerBar = transparent(new GridBagLayout());
+        GridBagConstraints player = new GridBagConstraints();
+        player.gridy = 0;
+        player.weightx = 1;
+        player.fill = GridBagConstraints.HORIZONTAL;
+        playerBar.add(flipped ? whiteCard : blackCard, player);
+        player.weightx = 0;
+        player.insets = new Insets(0, 14, 0, 14);
+        playerBar.add(arenaVersus(text), player);
+        player.weightx = 1;
+        player.insets = new Insets(0, 0, 0, 0);
+        playerBar.add(flipped ? blackCard : whiteCard, player);
+        mast.add(playerBar, BorderLayout.CENTER);
         add(mast, BorderLayout.NORTH);
 
         board = new ChessBoardPanel(frame.assets(), frame.prefs(), frame.prefs().theme(), this::canMove,
                 options -> promote(this, frame.assets(), text, snapshot.seat()),
                 move -> submit(Action.MOVE, move));
         board.setFocusMode(focus.isFocusMode());
-        board.setFlipped(flip(frame.prefs(), value.seat()));
+        board.setFlipped(flipped);
         add(board, BorderLayout.CENTER);
 
         // Prominent Waiting Banner (visible only while waiting for Black to join)
@@ -301,20 +320,11 @@ final class OnlineView extends JPanel {
         waitingBanner.add(stack(eyebrow(text.get("onlineWaiting")), Box.createVerticalStrut(4),
                 row(codeDisplay, bannerCopy), Box.createVerticalStrut(2), waitHint), BorderLayout.CENTER);
 
-        whitePlayer.setFont(sans(Font.BOLD, 12.5f));
-        blackPlayer.setFont(sans(Font.BOLD, 12.5f));
-        JPanel clocks = stack(
-                waitingBanner,
-                Box.createVerticalStrut(6),
-                whitePlayer, whiteClock,
-                Box.createVerticalStrut(8),
-                blackPlayer, blackClock,
-                Box.createVerticalStrut(10),
-                gameStatus);
-
         JPanel rail = card(new BorderLayout(0, 10));
-        rail.setPreferredSize(new Dimension(270, 440));
-        rail.add(clocks, BorderLayout.NORTH);
+        rail.setPreferredSize(new Dimension(260, 440));
+        rail.add(stack(waitingBanner, gameStatus, eyebrow(text.get("moveHistory"))), BorderLayout.NORTH);
+        captures = new RoyalCapturedTray(frame.assets(), text);
+        rail.add(captures, BorderLayout.SOUTH);
         moves = new JTextArea();
         moves.setEditable(false);
         moves.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 15));
@@ -337,18 +347,22 @@ final class OnlineView extends JPanel {
         backToLobby = button(text.get("onlineBackToLobby"), true, this::returnToLobby);
         backToLobby.setVisible(value.outcome() != null);
 
-        JPanel controls = transparent(new GridLayout(0, 2, 5, 5));
+        JPanel controls = transparent(new FlowLayout(FlowLayout.CENTER, 8, 0));
         controls.add(button(text.get("flip"), false, board::flip));
         controls.add(modeButton);
         controls.add(draw);
         controls.add(claim);
         controls.add(resign);
         controls.add(button(text.get("onlineSync"), false, this::refresh));
-        rail.add(stack(backToLobby, Box.createVerticalStrut(6), controls, Box.createVerticalStrut(8), notice),
-                BorderLayout.SOUTH);
+        controls.add(backToLobby);
+        JPanel actionBar = transparent(new BorderLayout(0, 6));
+        actionBar.add(controls, BorderLayout.CENTER);
+        actionBar.add(notice, BorderLayout.SOUTH);
+        add(actionBar, BorderLayout.SOUTH);
         add(rail, BorderLayout.EAST);
 
         accept(value);
+        frame.refreshShellAtmosphere();
         connect();
         timer.start();
         revalidate();
@@ -369,6 +383,7 @@ final class OnlineView extends JPanel {
         }
         Snapshot old = snapshot;
         snapshot = value;
+        paintIdentities();
         connected = true;
         lastSyncNano = System.nanoTime();
         nextPollNano = lastSyncNano + DurationNanos.seconds(socket == null ? 3 : 12);
@@ -376,7 +391,18 @@ final class OnlineView extends JPanel {
             List<Ply> history = value.moves();
             Move last = history.isEmpty() ? null : Move.uci(history.get(history.size() - 1).uci());
             boolean singleMoveAdvance = old != null && history.size() == old.moves().size() + 1;
-            board.update(Position.fromFen(value.fen()), last, singleMoveAdvance);
+            Position position = Position.fromFen(value.fen());
+            check = Rules.inCheck(position, position.turn());
+            board.update(position, last, singleMoveAdvance);
+            Position replay = Position.initial();
+            var taken = new java.util.ArrayList<Piece>();
+            for (Ply ply : history) {
+                Move move = Move.uci(ply.uci());
+                Piece captured = replay.captured(move);
+                if (captured != null) taken.add(captured);
+                replay = replay.afterGeneratedMove(move);
+            }
+            captures.update(taken);
             if (singleMoveAdvance && value.outcome() == null && frame.prefs().sound()) {
                 String san = history.get(history.size() - 1).san();
                 String cue = san.contains("+") || san.contains("#") ? "check"
@@ -452,24 +478,29 @@ final class OnlineView extends JPanel {
         return snapshot.playing() && snapshot.turn() == side ? Math.max(0, base - elapsed) : base;
     }
 
-    private void paintClocks() {
-        String wName = snapshot.white() == null ? "…" : snapshot.white();
-        String bName = snapshot.black() == null ? text.get("onlineWaiting") : snapshot.black();
-        whitePlayer.setText(text.get("side.WHITE") + " · " + wName);
-        blackPlayer.setText(text.get("side.BLACK") + " · " + bName);
-        whitePlayer.setForeground(snapshot.turn() == Side.WHITE && snapshot.playing() ? PALE : MUTED);
-        blackPlayer.setForeground(snapshot.turn() == Side.BLACK && snapshot.playing() ? PALE : MUTED);
+    private RoyalPlayerCard playerCard(Side side, Snapshot state) {
+        return new RoyalPlayerCard(frame.assets(), side, " ", text.get("side." + side),
+                false, "", side == state.seat() ? frame.avatar() : RoyalAvatar.EMBLEM);
+    }
 
-        long wMs = remaining(Side.WHITE);
-        long bMs = remaining(Side.BLACK);
-        whiteClock.setText(clock(wMs));
-        blackClock.setText(clock(bMs));
-        whiteClock.setForeground(snapshot.playing() && snapshot.turn() == Side.WHITE
-                ? (wMs < 30_000L ? WARN_CLOCK : PALE) : MUTED);
-        blackClock.setForeground(snapshot.playing() && snapshot.turn() == Side.BLACK
-                ? (bMs < 30_000L ? WARN_CLOCK : PALE) : MUTED);
-        whiteClock.setToolTipText(wName);
-        blackClock.setToolTipText(bName);
+    private void paintIdentities() {
+        var whiteAvatar = snapshot.whiteAvatar() == null && snapshot.seat() == Side.WHITE
+                ? frame.avatar() : RoyalAvatar.byId(snapshot.whiteAvatar());
+        var blackAvatar = snapshot.blackAvatar() == null && snapshot.seat() == Side.BLACK
+                ? frame.avatar() : RoyalAvatar.byId(snapshot.blackAvatar());
+        whiteCard.identity(snapshot.white() == null ? text.get("side.WHITE") : snapshot.white(), whiteAvatar);
+        blackCard.identity(snapshot.black() == null ? text.get("onlineWaiting") : snapshot.black(), blackAvatar);
+    }
+
+    private void paintClocks() {
+        updateClock(whiteCard, Side.WHITE);
+        updateClock(blackCard, Side.BLACK);
+    }
+
+    private void updateClock(RoyalPlayerCard card, Side side) {
+        long remaining = remaining(side);
+        boolean active = snapshot.playing() && snapshot.turn() == side;
+        card.update(clock(remaining), true, active, active && remaining < 30_000L, check, null);
     }
 
     private void submit(Action action, Move move) {

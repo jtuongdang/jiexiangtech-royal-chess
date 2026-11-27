@@ -44,14 +44,15 @@ final class RoyalCapturedTray extends JPanel {
     }
 
     void update(Game game, int count) {
+        var moves = game.moves();
+        update(moves.stream().limit(Math.max(0, count)).map(Game.Ply::captured).filter(java.util.Objects::nonNull).toList());
+    }
+
+    void update(java.util.List<Piece> capturedPieces) {
         Map<Piece, Integer> byWhite = new LinkedHashMap<>();
         Map<Piece, Integer> byBlack = new LinkedHashMap<>();
         int whitePts = 0, blackPts = 0;
-        var moves = game.moves();
-        int limit = Math.min(count, moves.size());
-        for (int i = 0; i < limit; i++) {
-            Piece captured = moves.get(i).captured();
-            if (captured == null) continue;
+        for (Piece captured : capturedPieces) {
             if (captured.side() == Side.BLACK) {
                 byWhite.merge(captured, 1, Integer::sum);
                 whitePts += value(captured.kind());

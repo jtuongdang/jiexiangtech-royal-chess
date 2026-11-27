@@ -341,6 +341,17 @@ public final class SqliteChessStore implements ChessStore {
         });
     }
 
+    @Override public String avatar(long owner) {
+        return db.read(connection -> appSetting(connection, "user:" + owner + ":avatar"));
+    }
+
+    @Override public void avatar(long owner, String avatarId) {
+        db.write(connection -> {
+            saveAppSetting(connection, "user:" + owner + ":avatar", avatarId);
+            return null;
+        });
+    }
+
     private static String appSetting(Connection connection, String key) throws SQLException {
         try (var select = connection.prepareStatement("SELECT value FROM app_settings WHERE key=?")) {
             select.setString(1, key);
